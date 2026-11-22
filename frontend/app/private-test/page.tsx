@@ -26,9 +26,18 @@ async function call(path:string, options:RequestInit={}):Promise<any>{
     const dashStatus=Number.isInteger(details?.dashboardHttpStatus) ? details.dashboardHttpStatus : null;
     const code=typeof payload.code==='string' && /^[A-Z_]{3,50}$/.test(payload.code)
       ? payload.code : '';
+    const redirectReason=['missing_location','invalid_location','external_location','unexpected_path','too_many_redirects']
+      .includes(details?.redirectReason) ? details.redirectReason : '';
+    const redirectKind=['index','root'].includes(details?.redirectKind) ? details.redirectKind : '';
+    const followCount=Number.isInteger(details?.redirectsFollowed) && details.redirectsFollowed<=3
+      ? details.redirectsFollowed : null;
     const safeTrace=[code, stage ? 'step='+stage : '',
       postStatus!==null ? 'POST='+postStatus : '',
       type ? 'type='+type : '',
+      redirectKind ? 'redirectType='+redirectKind : '',
+      redirectReason ? 'redirectIssue='+redirectReason : '',
+      details?.upgradedHttps===true ? 'httpsUpgrade=true' : '',
+      followCount!==null ? 'redirectHops='+followCount : '',
       dashStatus!==null ? 'dashboard='+dashStatus : '',
       dashboardType ? 'dashboardType='+dashboardType : ''
     ].filter(Boolean).join(' · ');
