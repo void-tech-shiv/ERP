@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { load } from 'cheerio';
 import { resolveERPRedirect, type RedirectError } from '../../../../lib/server/erp_redirect';
+import { inspectERPPage } from '../../../../lib/server/erp_auth_verify';
 import {
   clearERPState, fail, getERPState, setERPState, testingEnabled,
   upstream, validOrigin, validateCSRF
@@ -26,6 +27,10 @@ type SafeDiagnostic = {
   redirectKind?: 'index' | 'root';
   redirectsFollowed?: number;
   upgradedHttps?: boolean;
+  fallback?: 'index-probe' | 'dashboard-probe';
+  loginFormDetected?: boolean;
+  studentIdentityVisible?: boolean;
+  dashboardMarkersDetected?: boolean;
 };
 
 function safeResponseType(html: string): SafeDiagnostic['loginResponseType'] {
@@ -87,14 +92,6 @@ function classifyERPLogin(status: number, text: string): LoginIssue {
   return 'ERP_LOGIN_NOT_CONFIRMED';
 }
 
-function isVerifiedDashboard(html:string,studentId:string):boolean {
-  // A full backend GET after login is required; redirect status alone is not proof.
-  const $=load(html);
-  $('script,style,noscript').remove();
-  const text=$('body').text().replace(/\s+/g,' ');
-  return new RegExp('\\bWelcome\\s+'+studentId+'\\b','i').test(text);
-}
-
 export async function POST(request:Request) {
   if(!testingEnabled) return fail('Private ERP testing is unavailable',503);
   if(!(await validOrigin())) return fail('Origin rejected',403);
@@ -136,6 +133,10 @@ export async function POST(request:Request) {
         // Some 302 responses omit Location. Only probe the fixed known
         // dashboard; never infer authentication from the 302 itself.
         diagnostic.redirectReason='missing_location';
+        // Browser DevTools showed GET /index.php between the login 302
+        // and /index.php?r=site%2Findexindi. Preserve that step and cookies.
+        dashboardUrl=ERP_ROOT+'/index.php';
+        diagnostic.fallback='index-probe';
       } else {
         diagnostic.redirectReason=target.reason;
         return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
@@ -148,43 +149,65 @@ export async function POST(request:Request) {
     } else {
       return failure(classifyERPLogin(result.status,''),result.status>=500?502:401,diagnostic);
     }
-    // Follow at most 3 same-host HTTPS redirects, updating the session cookie
-    // jar on each response. A redirect is never sufficient proof of login.
+    // Read only same-origin HTTPS ERP pages and follow at most 4 hops.
+    // A 302/200 status alone is never treated as proof of authentication.
     let verified=false;
-    for(let hop=0;hop<4;hop++) {
+    let attemptedFixedDashboard=false;
+    const fixedDashboard=ERP_ROOT+'/index.php?r=site%2Findexindi';
+    for(let hop=0;hop<5;hop++) {
       diagnostic.stage='dashboard';
-      const dashboard=await upstream(dashboardUrl,state);
-      diagnostic.dashboardHttpStatus=dashboard.status;
-      if([301,302,303].includes(dashboard.status)) {
+      const page=await upstream(dashboardUrl,state);
+      diagnostic.dashboardHttpStatus=page.status;
+      if([301,302,303].includes(page.status)) {
         diagnostic.stage='redirect';
-        if(hop===3) {
+        if(hop>=4) {
           diagnostic.redirectReason='too_many_redirects';
           return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
         }
-        const next=resolveERPRedirect(dashboard.headers.get('location'),dashboardUrl);
-        if(!next.ok) {
-          diagnostic.redirectReason=next.reason;
-          return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
+        const next=resolveERPRedirect(page.headers.get('location'),dashboardUrl);
+        if(next.ok && next.url!==dashboardUrl) {
+          dashboardUrl=next.url;
+          diagnostic.redirectKind=next.kind;
+          diagnostic.redirectsFollowed=(diagnostic.redirectsFollowed||0)+1;
+          if(next.upgradedHttps) diagnostic.upgradedHttps=true;
+          continue;
         }
-        if(next.url===dashboardUrl) {
-          diagnostic.redirectReason='too_many_redirects';
-          return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
+        if(!attemptedFixedDashboard &&
+            (!next.ok && next.reason==='missing_location')) {
+          // Some reverse-proxy 302 responses omit Location. The fixed
+          // dashboard URL comes from the user's observed successful flow.
+          attemptedFixedDashboard=true;
+          diagnostic.redirectReason='missing_location';
+          diagnostic.fallback='dashboard-probe';
+          dashboardUrl=fixedDashboard;
+          continue;
         }
-        dashboardUrl=next.url;
-        diagnostic.redirectKind=next.kind;
-        diagnostic.redirectsFollowed=(diagnostic.redirectsFollowed||0)+1;
-        if(next.upgradedHttps) diagnostic.upgradedHttps=true;
-        continue;
+        diagnostic.redirectReason=next.ok?'too_many_redirects':next.reason;
+        return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
       }
-      if(dashboard.status!==200) return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
-      const html=await dashboard.text();
-      diagnostic.dashboardResponseType=safeResponseType(html)==='login-form'
+      if(page.status!==200) return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
+      const html=await page.text();
+      const evidence=inspectERPPage(html,username);
+      diagnostic.loginFormDetected=evidence.loginForm;
+      diagnostic.studentIdentityVisible=evidence.identityVisible;
+      diagnostic.dashboardMarkersDetected=evidence.dashboardMarkers;
+      diagnostic.dashboardResponseType=evidence.loginForm
         ? 'login-form'
         : (/<html|<body|<div/i.test(html.slice(0,5000)) ? 'html' : 'other');
-      if(html.length>1_000_000 || !isVerifiedDashboard(html,username))
-        return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
-      verified=true;
-      break;
+      if(evidence.verified) {
+        verified=true;
+        break;
+      }
+      // An intermediate /index.php can render HTTP 200 rather than redirect.
+      // A final probe of the *known* dashboard is safe, but only actual
+      // identity evidence can make the session authenticated.
+      if(!attemptedFixedDashboard && dashboardUrl===ERP_ROOT+'/index.php') {
+        attemptedFixedDashboard=true;
+        diagnostic.fallback='dashboard-probe';
+        dashboardUrl=fixedDashboard;
+        continue;
+      }
+      return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
     }
     if(!verified) return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
     state.phase='authenticated';
