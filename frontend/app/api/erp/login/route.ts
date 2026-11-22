@@ -1,15 +1,81 @@
 import { NextResponse } from 'next/server';
-import { clearERPState, fail, getERPState, setERPState, testingEnabled, upstream, validOrigin, validateCSRF } from '../../../../lib/server/erp';
+import { load } from 'cheerio';
+import {
+  clearERPState, fail, getERPState, setERPState, testingEnabled,
+  upstream, validOrigin, validateCSRF
+} from '../../../../lib/server/erp';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
+
+const ERP_ROOT='https://newerp.kluniversity.in';
+
+type LoginIssue =
+  | 'CAPTCHA_REJECTED' | 'CREDENTIALS_REJECTED'
+  | 'CSRF_OR_SESSION_REJECTED' | 'ERP_LOGIN_NOT_CONFIRMED'
+  | 'ERP_LOGIN_UNAVAILABLE';
+
+function failure(issue: LoginIssue, status = 401): Response {
+  const messages: Record<LoginIssue, string> = {
+    CAPTCHA_REJECTED: 'The ERP explicitly rejected the CAPTCHA. Request a fresh image and enter its new characters.',
+    CREDENTIALS_REJECTED: 'The ERP returned a username or password validation error. Confirm your credentials on the official ERP.',
+    CSRF_OR_SESSION_REJECTED: 'The ERP session or form verification expired. Start a new CAPTCHA session.',
+    ERP_LOGIN_NOT_CONFIRMED: 'The ERP did not confirm login. The CAPTCHA may be correct; check ERP session initialization or browser-only login steps.',
+    ERP_LOGIN_UNAVAILABLE: 'The ERP login service did not provide an expected response. Please try later.',
+  };
+  return Response.json({error: messages[issue], code: issue}, {
+    status, headers: {'Cache-Control':'no-store'}
+  });
+}
+
+/** Safe classification only: never send raw ERP HTML, user input or cookies. */
+function classifyERPLogin(status: number, text: string): LoginIssue {
+  if (status === 403 || status === 419) return 'CSRF_OR_SESSION_REJECTED';
+  if (status >= 500 || status === 429) return 'ERP_LOGIN_UNAVAILABLE';
+  if (text.length > 200_000) return 'ERP_LOGIN_NOT_CONFIRMED';
+  let errorText = '';
+  const trimmed = text.trim();
+  // Yii ActiveForm can respond with JSON errors instead of a redirect.
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    try {
+      const payload=JSON.parse(trimmed);
+      errorText=JSON.stringify(payload).toLowerCase().slice(0,10000);
+    } catch { /* Not JSON; read any HTML validation elements below. */ }
+  }
+  if (!errorText) {
+    const $=load(text);
+    errorText=$(
+      '.invalid-feedback, .help-block, .error-summary, .has-error .help-block, ' +
+      '.field-loginform-captcha .help-block, .field-loginform-password .help-block, ' +
+      'input[aria-invalid="true"] + div'
+    ).text().toLowerCase().slice(0,10000);
+  }
+  if (/(captcha|verification code|verification text)/i.test(errorText) &&
+      /(incorrect|invalid|wrong|does not match|required|empty)/i.test(errorText))
+    return 'CAPTCHA_REJECTED';
+  if (/(username|password|credentials|account)/i.test(errorText) &&
+      /(incorrect|invalid|wrong|not found|not recognized|failed)/i.test(errorText))
+    return 'CREDENTIALS_REJECTED';
+  if (/(csrf|session expired|session verification)/i.test(errorText))
+    return 'CSRF_OR_SESSION_REJECTED';
+  return 'ERP_LOGIN_NOT_CONFIRMED';
+}
+
+function isVerifiedDashboard(html:string,studentId:string):boolean {
+  // A full backend GET after login is required; redirect status alone is not proof.
+  const $=load(html);
+  $('script,style,noscript').remove();
+  const text=$('body').text().replace(/\s+/g,' ');
+  return new RegExp('\\bWelcome\\s+'+studentId+'\\b','i').test(text);
+}
+
 export async function POST(request:Request) {
   if(!testingEnabled) return fail('Private ERP testing is unavailable',503);
   if(!(await validOrigin())) return fail('Origin rejected',403);
   const state=await getERPState();
   if(!state || state.phase!=='challenge') return fail('CAPTCHA session expired; refresh the challenge',401);
   if(!validateCSRF(state.csrf,request.headers.get('x-attendly-csrf'))) return fail('Verification request invalid',403);
-  // Consume the challenge even if upstream authentication fails.
+  // Consume the challenge on any login attempt; no automatic retry of a failed CAPTCHA.
   await clearERPState();
   try {
     if(Number(request.headers.get('content-length')||'0')>4096) return fail('Login request too large',400);
@@ -19,31 +85,51 @@ export async function POST(request:Request) {
     if(!/^[0-9]{5,24}$/.test(username)||!password||password.length>256||captcha.length<1||captcha.length>32)
       return fail('Invalid login input',400);
     if(fields?.consent!==true) return fail('Confirm personal-account testing consent',403);
+    if(!state.formToken || !state.loginAction || !Object.keys(state.upstream).length)
+      return failure('CSRF_OR_SESSION_REJECTED');
     const form=new URLSearchParams({
-      '_csrf':state.formToken||'',
+      '_csrf':state.formToken,
       'LoginForm[username]':username,
       'LoginForm[password]':password,
       'LoginForm[captcha]':captcha,
       'LoginForm[qr_code]':'',
       'login-button':'',
     });
-    const result=await upstream(state.loginAction||'/index.php?r=site%2Flogin',state,'POST',form);
-    if(![301,302,303].includes(result.status)) return fail('ERP rejected login or CAPTCHA',401);
-    const location=result.headers.get('location');
-    if(!location) return fail('ERP login confirmation unavailable',502);
-    const redirectUrl=new URL(location,state.loginAction);
-    if(redirectUrl.origin!=='https://newerp.kluniversity.in' || redirectUrl.pathname!=='/index.php') return fail('Unexpected ERP redirect',502);
-    const dashboard=await upstream(redirectUrl.toString(),state);
-    if(dashboard.status!==200) return fail('ERP dashboard not available',502);
+    const result=await upstream(state.loginAction,state,'POST',form);
+    let dashboardUrl=ERP_ROOT+'/index.php?r=site%2Findexindi';
+    if([301,302,303].includes(result.status)) {
+      const location=result.headers.get('location');
+      if(!location) return failure('ERP_LOGIN_NOT_CONFIRMED');
+      const target=new URL(location,state.loginAction);
+      if(target.origin!==ERP_ROOT || target.pathname!=='/index.php')
+        return failure('ERP_LOGIN_NOT_CONFIRMED');
+      dashboardUrl=target.toString();
+    } else if(result.status===200) {
+      const body=await result.text();
+      const issue=classifyERPLogin(result.status,body);
+      // If validation explicitly fails, do not attempt another ERP request.
+      if(issue!=='ERP_LOGIN_NOT_CONFIRMED') return failure(issue);
+      // Some ERP logins may complete without a redirect. Verify with a separate
+      // authenticated dashboard GET; NEVER trust the response body alone.
+    } else {
+      return failure(classifyERPLogin(result.status,''),result.status>=500?502:401);
+    }
+    const dashboard=await upstream(dashboardUrl,state);
+    if(dashboard.status!==200) return failure('ERP_LOGIN_NOT_CONFIRMED');
     const html=await dashboard.text();
-    const visible=html.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<style[\s\S]*?<\/style>/gi,'').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\s+/g,' ');
-    const welcome=new RegExp('Welcome\\s+'+username+'\\b','i');
-    if(!welcome.test(visible)) return fail('Student identity could not be verified',401);
-    state.phase='authenticated';state.studentId=username;state.formToken=undefined;state.loginAction=undefined;
-    state.csrf=crypto.randomUUID();state.expires=Date.now()+20*60*1000;
+    if(html.length>1_000_000 || !isVerifiedDashboard(html,username))
+      return failure('ERP_LOGIN_NOT_CONFIRMED');
+    state.phase='authenticated';
+    state.studentId=username;
+    state.formToken=undefined;
+    state.loginAction=undefined;
+    state.csrf=crypto.randomUUID();
+    state.expires=Date.now()+20*60*1000;
     await setERPState(state);
-    return NextResponse.json({ok:true,studentId:username,csrfToken:state.csrf},{headers:{'Cache-Control':'no-store'}});
+    return NextResponse.json({ok:true,studentId:username,csrfToken:state.csrf},{
+      headers:{'Cache-Control':'no-store'}
+    });
   } catch {
-    return fail('ERP login could not be completed',502);
+    return failure('ERP_LOGIN_UNAVAILABLE',502);
   }
 }
