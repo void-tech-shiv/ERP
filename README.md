@@ -3,7 +3,7 @@
 Independent, student-focused attendance dashboard (prototype).
 
 ## Current status
-Phase 1: weighted attendance dashboard. Phase 2: HTML response parsing. Phase 3: isolated session/CAPTCHA/login/attendance engine validated against synthetic ERP responses. **The public API is still disabled and this repository has not been validated against the real KL NewERP login.** Never enter real ERP credentials into an unverified demo.
+Phase 1: weighted attendance dashboard. Phase 2: HTML response parsing. Phase 3: isolated session/CAPTCHA/login/attendance engine validated against synthetic ERP responses. Phase 4: secure, demo-only browser sessions integrated into the dashboard. **The real ERP public login API is still disabled and this repository has not been validated against the real KL NewERP login.** Never enter real ERP credentials into an unverified demo.
 
 ## Calculation
 - Lecture (L): 100%
@@ -147,3 +147,60 @@ cd backend
 python -m pip install -r requirements.txt
 python -m pytest -q
 ```
+
+## Phase 4: Secure browser demo session (no real ERP credentials)
+
+The dashboard now has `Start secure demo`, `Refresh sample` and
+`End demo session` actions. These call our own FastAPI backend (via
+Next.js same-origin `/api/*` rewrite), but they operate **only on fictitious
+sample attendance**. The real university ERP routes remain disabled.
+
+Demo API surface:
+
+| Method | Route | Purpose |
+|---|---|---|
+| POST | `/api/demo/session` | Explicitly start sample session; requires `X-Attendly-Demo: start` and no request body |
+| GET | `/api/demo/session` | Restore demo state; returns demo-mode status and an ephemeral CSRF token |
+| GET | `/api/demo/session/attendance` | Read sample attendance, requires a valid demo session |
+| POST | `/api/demo/logout` | Requires `X-Attendly-CSRF`; revokes session and clears cookie |
+| GET | `/api/integration/status` | Returns `enabled: false` for real university integration |
+| POST | `/api/auth/login` | **Disabled (503)**; does not accept student logins |
+
+Security implemented in this demo scaffold:
+
+- Random opaque session handles; backend stores only their SHA-256 hashes.
+- `HttpOnly` + `SameSite=Strict` cookie, `Secure` when `APP_ENV=production`,
+  path `/api`, maximum age 1 hour; browser JavaScript never reads the cookie.
+- CSRF synchronizer token held in frontend memory, verified on logout, never
+  placed into IndexedDB or localStorage.
+- Origin allowlist for mutations, cross-site browser requests rejected,
+  demo start requires a custom header and rejects ordinary request bodies.
+- In-process per-client start rate limit (12 per minute, max 2000 sessions).
+- Session rotation and expiry, no-store headers on demo/session responses.
+- Attendance cache cleared on logout; only sample data is displayed.
+- Unit tests for expiry, token rotation, CSRF, origin, two-browser isolation,
+  opt-in, logout, rate limits and the real-login-disabled security gate.
+
+**Local quick start**: open one terminal in `backend` and run
+`python -m pip install -r requirements.txt && uvicorn app.main:app --reload --port 8000`.
+Open another terminal in `frontend`, run `npm install && npm run dev`,
+then visit http://localhost:3000 and click **Start secure demo**.
+
+For development, `APP_ENV` defaults to `development` and local
+`APP_ORIGINS` defaults to `localhost:3000`, `127.0.0.1:3000`, and backend
+origins on port 8000. For a production-like HTTPS test, set
+`APP_ENV=production` and `APP_ORIGINS=https://your-app.example`.
+Do not set a wildcard origin.
+
+**Deployment limitations:** this state store is in-memory, tied to one server
+worker, and is NOT suitable for a large public student launch. Future approved
+ERP integration needs secure distributed session storage (for example Redis
+with encrypted ERP cookie values and defined retention), trusted-proxy-aware
+rate limiting, durable audit controls without personal data, consent/privacy
+workflows and permission to access the university ERP. Do not deploy public
+university credential forms based on this demo scaffold.
+
+**Verification:** 23 Phase 3/4 regression tests passed in a local Python
+working copy. A production-mode smoke test confirmed the cookie security
+flags and Origin requirement. The complete Next.js build and GitHub CI
+status have not yet been verified.
