@@ -3,7 +3,7 @@
 Independent, student-focused attendance dashboard (prototype).
 
 ## Current status
-Phase 1: weighted attendance calculator and demo dashboard. Phase 2: HTML attendance response parser implemented and tested. **This repository does not yet connect to KL NewERP.** Never enter real ERP credentials into an unverified demo.
+Phase 1: weighted attendance dashboard. Phase 2: HTML response parsing. Phase 3: isolated session/CAPTCHA/login/attendance engine validated against synthetic ERP responses. **The public API is still disabled and this repository has not been validated against the real KL NewERP login.** Never enter real ERP credentials into an unverified demo.
 
 ## Calculation
 - Lecture (L): 100%
@@ -103,3 +103,47 @@ requests. Its unit tests use only synthetic HTML.
 
 The public application must **not** accept students' ERP credentials until
 University access permission and independent security review are complete.
+
+## Phase 3: isolated session engine (offline-tested)
+
+`backend/app/session_manager.py` implements the *internal* ERP request sequence.
+It is **not imported by any public FastAPI authentication route**. No real
+student IDs, passwords or CAPTCHA answers were used during development.
+
+- `new_challenge()`: creates a separate HTTP cookie jar for one student,
+  fetches login HTML and session-bound CAPTCHA bytes, generates an opaque
+  challenge handle (5-minute default lifetime).
+- `authenticate(challenge, id, password, student_entered_captcha)`:
+  submits the student's input alongside the session CSRF to the observed
+  login route. A redirect is insufficient: the resulting dashboard must
+  display a matching student ID. The challenge is consumed after one try.
+- `available_terms(session)`: dynamically reads semester/year *labels*
+  and their internal option IDs. No hardcoded `29` or `2` in application logic.
+- `attendance(session, year_label, semester_label)`: reads a fresh
+  session CSRF and term IDs; posts the known course-list request in the same
+  cookie jar; passes the returned HTML through the safe LTPS parser.
+- `logout(session)`: destroys the in-memory session and closes its HTTP
+  client. Challenge TTL defaults to 5 minutes; authenticated session TTL to
+  30 minutes. Handle values must **never** be saved to localStorage.
+
+**Verification status:** 7 new tests passed locally against an
+`httpx.MockTransport` fake ERP. GitHub CI validation and behavior
+against the actual university website are **not yet verified**.
+Real-world integration may require adjustments to Yii's CAPTCHA/session
+behavior, form HTML, dynamic term options and logout semantics.
+
+**Why public login stays disabled:** this is a prototype-level in-process
+store, not a production multi-instance session service. It lacks distributed
+encrypted storage, app-cookie authentication, cross-site request protections,
+rate limiting, operational monitoring, and institution-approved access.
+ERP credentials must not be entered into the demo. A real deployment needs
+university authorization, privacy notice, student consent, independent security
+review and live testing with a specifically approved test account.
+
+Run locally:
+
+```bash
+cd backend
+python -m pip install -r requirements.txt
+python -m pytest -q
+```
