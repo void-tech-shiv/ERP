@@ -38,8 +38,12 @@ async function call(path:string, options:RequestInit={}):Promise<any>{
       redirectReason ? 'redirectIssue='+redirectReason : '',
       details?.upgradedHttps===true ? 'httpsUpgrade=true' : '',
       followCount!==null ? 'redirectHops='+followCount : '',
+      ['index-probe','dashboard-probe'].includes(details?.fallback) ? 'fallback='+details.fallback : '',
       dashStatus!==null ? 'dashboard='+dashStatus : '',
-      dashboardType ? 'dashboardType='+dashboardType : ''
+      dashboardType ? 'dashboardType='+dashboardType : '',
+      typeof details?.loginFormDetected==='boolean' ? 'loginForm='+details.loginFormDetected : '',
+      typeof details?.studentIdentityVisible==='boolean' ? 'identityVisible='+details.studentIdentityVisible : '',
+      typeof details?.dashboardMarkersDetected==='boolean' ? 'dashboardMarkers='+details.dashboardMarkersDetected : ''
     ].filter(Boolean).join(' · ');
     throw new Error((payload.error||'ERP request failed ('+response.status+')') +
       (safeTrace ? ' [Diagnostic: '+safeTrace+']' : ''));
