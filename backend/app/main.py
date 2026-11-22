@@ -23,7 +23,7 @@ def health():
 
 @app.get("/api/integration/status")
 def integration_status():
-    return {"enabled": False, "reason": "ERP login/session endpoints are not verified"}
+    return {"enabled": False, "phase": "session-engine-offline", "reason": "Isolated ERP session engine tested with fake responses; public login disabled pending authorization and real-world validation"}
 
 @app.get("/api/demo/attendance")
 def demo():
