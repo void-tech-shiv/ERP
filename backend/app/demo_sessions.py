@@ -72,11 +72,13 @@ class DemoSessions:
             attempts = self._starts.get(client_id, [])
             if len(attempts) >= self.max_starts_per_window:
                 raise DemoRateLimited()
-            if len(self._sessions) >= self.max_sessions:
+            old_key = self._key(prior_token) if prior_token else None
+            active_after_rotation = len(self._sessions) - int(old_key in self._sessions)
+            if active_after_rotation >= self.max_sessions:
                 raise DemoCapacityReached()
             self._starts.setdefault(client_id, []).append(now)
-            if prior_token:
-                self._sessions.pop(self._key(prior_token), None)
+            if old_key is not None:
+                self._sessions.pop(old_key, None)
             token = secrets.token_urlsafe(32)
             session = DemoSession(
                 csrf=secrets.token_urlsafe(32),
