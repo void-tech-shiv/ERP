@@ -15,7 +15,25 @@ type LoginIssue =
   | 'CSRF_OR_SESSION_REJECTED' | 'ERP_LOGIN_NOT_CONFIRMED'
   | 'ERP_LOGIN_UNAVAILABLE';
 
-function failure(issue: LoginIssue, status = 401): Response {
+type SafeDiagnostic = {
+  loginHttpStatus?: number;
+  loginResponseType?: 'redirect' | 'login-form' | 'json' | 'html' | 'other';
+  dashboardHttpStatus?: number;
+  dashboardResponseType?: 'login-form' | 'html' | 'other';
+  stage: 'login-post' | 'redirect' | 'dashboard' | 'session-write';
+};
+
+function safeResponseType(html: string): SafeDiagnostic['loginResponseType'] {
+  const snippet=html.slice(0,150_000).trim();
+  if(snippet.startsWith('{') || snippet.startsWith('[')) return 'json';
+  const $=load(snippet);
+  if($('input[name="LoginForm[username]"]').length &&
+    $('input[name="LoginForm[captcha]"]').length) return 'login-form';
+  if(/<html|<form|<body|<div/i.test(snippet)) return 'html';
+  return 'other';
+}
+
+function failure(issue: LoginIssue, status = 401, diagnostic?: SafeDiagnostic): Response {
   const messages: Record<LoginIssue, string> = {
     CAPTCHA_REJECTED: 'The ERP explicitly rejected the CAPTCHA. Request a fresh image and enter its new characters.',
     CREDENTIALS_REJECTED: 'The ERP returned a username or password validation error. Confirm your credentials on the official ERP.',
@@ -23,7 +41,10 @@ function failure(issue: LoginIssue, status = 401): Response {
     ERP_LOGIN_NOT_CONFIRMED: 'The ERP did not confirm login. The CAPTCHA may be correct; check ERP session initialization or browser-only login steps.',
     ERP_LOGIN_UNAVAILABLE: 'The ERP login service did not provide an expected response. Please try later.',
   };
-  return Response.json({error: messages[issue], code: issue}, {
+  return Response.json({
+    error: messages[issue], code: issue,
+    ...(diagnostic ? {diagnostic} : {})
+  }, {
     status, headers: {'Cache-Control':'no-store'}
   });
 }
@@ -96,29 +117,39 @@ export async function POST(request:Request) {
       'login-button':'',
     });
     const result=await upstream(state.loginAction,state,'POST',form);
+    const diagnostic: SafeDiagnostic={stage:'login-post',loginHttpStatus:result.status};
     let dashboardUrl=ERP_ROOT+'/index.php?r=site%2Findexindi';
     if([301,302,303].includes(result.status)) {
+      diagnostic.loginResponseType='redirect';
+      diagnostic.stage='redirect';
       const location=result.headers.get('location');
-      if(!location) return failure('ERP_LOGIN_NOT_CONFIRMED');
+      if(!location) return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
       const target=new URL(location,state.loginAction);
       if(target.origin!==ERP_ROOT || target.pathname!=='/index.php')
-        return failure('ERP_LOGIN_NOT_CONFIRMED');
+        return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
       dashboardUrl=target.toString();
     } else if(result.status===200) {
       const body=await result.text();
+      diagnostic.loginResponseType=safeResponseType(body);
       const issue=classifyERPLogin(result.status,body);
       // If validation explicitly fails, do not attempt another ERP request.
-      if(issue!=='ERP_LOGIN_NOT_CONFIRMED') return failure(issue);
-      // Some ERP logins may complete without a redirect. Verify with a separate
-      // authenticated dashboard GET; NEVER trust the response body alone.
+      if(issue!=='ERP_LOGIN_NOT_CONFIRMED') return failure(issue,401,diagnostic);
+      // A login-form response is not proof of a failed CAPTCHA; it can be
+      // missing session initialization or a form submission mismatch.
+      // Probe only the fixed official dashboard URL to verify identity.
     } else {
-      return failure(classifyERPLogin(result.status,''),result.status>=500?502:401);
+      return failure(classifyERPLogin(result.status,''),result.status>=500?502:401,diagnostic);
     }
+    diagnostic.stage='dashboard';
     const dashboard=await upstream(dashboardUrl,state);
-    if(dashboard.status!==200) return failure('ERP_LOGIN_NOT_CONFIRMED');
+    diagnostic.dashboardHttpStatus=dashboard.status;
+    if(dashboard.status!==200) return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
     const html=await dashboard.text();
+    diagnostic.dashboardResponseType=safeResponseType(html)==='login-form'
+      ? 'login-form'
+      : (/<html|<body|<div/i.test(html.slice(0,5000)) ? 'html' : 'other');
     if(html.length>1_000_000 || !isVerifiedDashboard(html,username))
-      return failure('ERP_LOGIN_NOT_CONFIRMED');
+      return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
     state.phase='authenticated';
     state.studentId=username;
     state.formToken=undefined;
