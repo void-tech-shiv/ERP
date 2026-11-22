@@ -12,7 +12,29 @@ const COMPONENTS:Part[]=['L','T','P','S'];
 async function call(path:string, options:RequestInit={}):Promise<any>{
   const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options});
   const payload=await response.json().catch(()=>({}));
-  if(!response.ok) throw new Error(payload.error||'ERP request failed ('+response.status+')');
+  if(!response.ok) {
+    const details=payload?.diagnostic;
+    // Only non-sensitive categoricals and HTTP status codes from our own
+    // server are displayed, never upstream HTML, cookies or login values.
+    const stage=['login-post','redirect','dashboard','session-write'].includes(details?.stage)
+      ? details.stage : '';
+    const type=['redirect','login-form','json','html','other'].includes(details?.loginResponseType)
+      ? details.loginResponseType : '';
+    const dashboardType=['login-form','html','other'].includes(details?.dashboardResponseType)
+      ? details.dashboardResponseType : '';
+    const postStatus=Number.isInteger(details?.loginHttpStatus) ? details.loginHttpStatus : null;
+    const dashStatus=Number.isInteger(details?.dashboardHttpStatus) ? details.dashboardHttpStatus : null;
+    const code=typeof payload.code==='string' && /^[A-Z_]{3,50}$/.test(payload.code)
+      ? payload.code : '';
+    const safeTrace=[code, stage ? 'step='+stage : '',
+      postStatus!==null ? 'POST='+postStatus : '',
+      type ? 'type='+type : '',
+      dashStatus!==null ? 'dashboard='+dashStatus : '',
+      dashboardType ? 'dashboardType='+dashboardType : ''
+    ].filter(Boolean).join(' · ');
+    throw new Error((payload.error||'ERP request failed ('+response.status+')') +
+      (safeTrace ? ' [Diagnostic: '+safeTrace+']' : ''));
+  }
   return payload;
 }
 
