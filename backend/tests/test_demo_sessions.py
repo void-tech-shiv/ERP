@@ -135,3 +135,10 @@ def test_store_capacity_and_invalid_parameters():
     assert type(error.value).__name__ == "DemoCapacityReached"
     with pytest.raises(ValueError):
         DemoSessions(ttl_seconds=0)
+
+def test_rotation_at_capacity_reuses_same_browser_slot():
+    store = DemoSessions(max_sessions=1)
+    old, _ = store.create("browser")
+    new, _ = store.create("browser", prior_token=old)
+    assert store.get(old) is None
+    assert store.get(new) is not None
