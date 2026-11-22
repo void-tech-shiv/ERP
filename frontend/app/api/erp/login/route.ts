@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { load } from 'cheerio';
+import { resolveERPRedirect, type RedirectError } from '../../../../lib/server/erp_redirect';
 import {
   clearERPState, fail, getERPState, setERPState, testingEnabled,
   upstream, validOrigin, validateCSRF
@@ -21,6 +22,10 @@ type SafeDiagnostic = {
   dashboardHttpStatus?: number;
   dashboardResponseType?: 'login-form' | 'html' | 'other';
   stage: 'login-post' | 'redirect' | 'dashboard' | 'session-write';
+  redirectReason?: RedirectError | 'too_many_redirects';
+  redirectKind?: 'index' | 'root';
+  redirectsFollowed?: number;
+  upgradedHttps?: boolean;
 };
 
 function safeResponseType(html: string): SafeDiagnostic['loginResponseType'] {
@@ -122,34 +127,66 @@ export async function POST(request:Request) {
     if([301,302,303].includes(result.status)) {
       diagnostic.loginResponseType='redirect';
       diagnostic.stage='redirect';
-      const location=result.headers.get('location');
-      if(!location) return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
-      const target=new URL(location,state.loginAction);
-      if(target.origin!==ERP_ROOT || target.pathname!=='/index.php')
+      const target=resolveERPRedirect(result.headers.get('location'),state.loginAction);
+      if(target.ok) {
+        dashboardUrl=target.url;
+        diagnostic.redirectKind=target.kind;
+        if(target.upgradedHttps) diagnostic.upgradedHttps=true;
+      } else if(target.reason==='missing_location') {
+        // Some 302 responses omit Location. Only probe the fixed known
+        // dashboard; never infer authentication from the 302 itself.
+        diagnostic.redirectReason='missing_location';
+      } else {
+        diagnostic.redirectReason=target.reason;
         return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
-      dashboardUrl=target.toString();
+      }
     } else if(result.status===200) {
       const body=await result.text();
       diagnostic.loginResponseType=safeResponseType(body);
       const issue=classifyERPLogin(result.status,body);
-      // If validation explicitly fails, do not attempt another ERP request.
       if(issue!=='ERP_LOGIN_NOT_CONFIRMED') return failure(issue,401,diagnostic);
-      // A login-form response is not proof of a failed CAPTCHA; it can be
-      // missing session initialization or a form submission mismatch.
-      // Probe only the fixed official dashboard URL to verify identity.
     } else {
       return failure(classifyERPLogin(result.status,''),result.status>=500?502:401,diagnostic);
     }
-    diagnostic.stage='dashboard';
-    const dashboard=await upstream(dashboardUrl,state);
-    diagnostic.dashboardHttpStatus=dashboard.status;
-    if(dashboard.status!==200) return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
-    const html=await dashboard.text();
-    diagnostic.dashboardResponseType=safeResponseType(html)==='login-form'
-      ? 'login-form'
-      : (/<html|<body|<div/i.test(html.slice(0,5000)) ? 'html' : 'other');
-    if(html.length>1_000_000 || !isVerifiedDashboard(html,username))
-      return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
+    // Follow at most 3 same-host HTTPS redirects, updating the session cookie
+    // jar on each response. A redirect is never sufficient proof of login.
+    let verified=false;
+    for(let hop=0;hop<4;hop++) {
+      diagnostic.stage='dashboard';
+      const dashboard=await upstream(dashboardUrl,state);
+      diagnostic.dashboardHttpStatus=dashboard.status;
+      if([301,302,303].includes(dashboard.status)) {
+        diagnostic.stage='redirect';
+        if(hop===3) {
+          diagnostic.redirectReason='too_many_redirects';
+          return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
+        }
+        const next=resolveERPRedirect(dashboard.headers.get('location'),dashboardUrl);
+        if(!next.ok) {
+          diagnostic.redirectReason=next.reason;
+          return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
+        }
+        if(next.url===dashboardUrl) {
+          diagnostic.redirectReason='too_many_redirects';
+          return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
+        }
+        dashboardUrl=next.url;
+        diagnostic.redirectKind=next.kind;
+        diagnostic.redirectsFollowed=(diagnostic.redirectsFollowed||0)+1;
+        if(next.upgradedHttps) diagnostic.upgradedHttps=true;
+        continue;
+      }
+      if(dashboard.status!==200) return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
+      const html=await dashboard.text();
+      diagnostic.dashboardResponseType=safeResponseType(html)==='login-form'
+        ? 'login-form'
+        : (/<html|<body|<div/i.test(html.slice(0,5000)) ? 'html' : 'other');
+      if(html.length>1_000_000 || !isVerifiedDashboard(html,username))
+        return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
+      verified=true;
+      break;
+    }
+    if(!verified) return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
     state.phase='authenticated';
     state.studentId=username;
     state.formToken=undefined;
