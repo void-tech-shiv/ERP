@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { fmt, totals, type Course, type Part } from '../../lib/calculator';
+import { clearERP, readERP, writeERP } from '../../lib/erp_cache';
 
 type Terms={years:string[];semesters:string[]};
 type Session={active:boolean;studentId?:string;csrfToken?:string};
@@ -44,6 +45,13 @@ export default function PrivateERPTest(){
       if(s.active){
         setCsrf(s.csrfToken);setStudentId(s.studentId);setStage('authenticated');
         await refreshTerms();
+        const cached=await readERP(s.studentId);
+        if(live && cached){
+          setCourses(cached.courses);
+          setYear(cached.academicYear);
+          setSemester(cached.semester);
+          setRefreshed(cached.savedAt+' (cached)');
+        }
       } else setStage('initial');
     }).catch(e=>{if(live){setStage('initial');setError(e.message)}});
     return ()=>{live=false};
@@ -82,18 +90,21 @@ export default function PrivateERPTest(){
         body:JSON.stringify({academicYear:year,semester}),
       });
       if(data.source!=='erp'||!Array.isArray(data.courses))throw new Error('Invalid attendance result');
-      setCourses(data.courses);setRefreshed(new Date().toLocaleString());
+      const time=new Date().toLocaleString();
+      setCourses(data.courses);setRefreshed(time);
+      await writeERP({studentId,academicYear:year,semester,courses:data.courses,savedAt:time});
     }catch(e){setError((e as Error).message)}finally{setBusy(false)}
   }
 
   async function logout(){
     setBusy(true);setError('');
-    try{await call('/api/erp/logout',{method:'POST',headers:{'X-Attendly-CSRF':csrf}})}
-    catch(e){setError((e as Error).message)}
-    finally{
+    try{
+      await call('/api/erp/logout',{method:'POST',headers:{'X-Attendly-CSRF':csrf}});
+      await clearERP();
       setPassword('');setCaptcha('');setCourses([]);setCsrf('');setStudentId('');
-      setStage('initial');setBusy(false);
-    }
+      setStage('initial');
+    } catch(e){setError((e as Error).message)}
+    finally {setBusy(false)}
   }
 
   const total=useMemo(()=>{
