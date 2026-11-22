@@ -31,3 +31,14 @@ export async function saveDemo(data:DemoSnapshot):Promise<void>{
     tx.onabort=()=>{db.close();resolve()};
   });
 }
+
+export async function clearDemo():Promise<void>{
+  const db=await openDb();if(!db)return;
+  return new Promise(resolve=>{
+    const tx=db.transaction(STORE,'readwrite');
+    tx.objectStore(STORE).delete(KEY);
+    tx.oncomplete=()=>{db.close();resolve()};
+    tx.onerror=()=>{db.close();resolve()};
+    tx.onabort=()=>{db.close();resolve()};
+  });
+}
