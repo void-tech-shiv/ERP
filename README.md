@@ -78,3 +78,28 @@ after that adapter has obtained an authorized response. There is **no public
 HTML-upload endpoint** and no live-login endpoint in this prototype.
 
 Run `cd backend && python -m pytest -q` to test parser and calculator.
+
+## Verified ERP login and CAPTCHA requests (November 2026)
+
+Redacted DevTools evidence suggests the university login POST goes to
+`index.php?r=site%2Flogin` with these form **names**:
+`_csrf`, `LoginForm[username]`, `LoginForm[password]`,
+`LoginForm[captcha]`, optional `LoginForm[qr_code]`, and `login-button`.
+The successful observed flow returned HTTP 302 then the student dashboard.
+
+The CAPTCHA image is requested from `index.php?r=site%2Fcaptcha&v=...`;
+the `v` value is dynamic and should not be hardcoded. It appears as an image
+request (HTTP 200, PNG). `yii.captcha.js` is not the CAPTCHA image.
+
+The next integration requires a university-authorized HTTP session whose
+initial login page, CAPTCHA image, login submission, and later attendance request
+**all share the correct server-side session cookies**. Never bypass CAPTCHA or
+send tokens/passwords to the browser cache. After login, verify the authenticated
+user, not merely a redirect status.
+
+`backend/app/erp_login_page.py` offers an offline parser for a same-origin
+login form, CSRF field, and CAPTCHA image URL. It does not perform live
+requests. Its unit tests use only synthetic HTML.
+
+The public application must **not** accept students' ERP credentials until
+University access permission and independent security review are complete.
