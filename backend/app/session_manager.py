@@ -24,7 +24,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from .calculator import Course
-from .erp_adapter import CaptchaChallenge
+from .erp_adapter import CaptchaChallenge, ErpAdapter
 from .erp_login_page import LoginFormMetadata, LoginDiscoveryError, _erp_url, discover_login_form
 from .erp_parser import AttendanceParseError, parse_course_list_html
 
@@ -47,7 +47,7 @@ class _Session:
     lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False)
 
 
-class ErpSessionManager:
+class ErpSessionManager(ErpAdapter):
     """Opaque challenge/session handles and isolated HTTP clients per student.
 
     All upstream HTTP calls are restricted to the known HTTPS ERP origin.
