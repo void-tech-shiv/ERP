@@ -20,7 +20,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     if (response.status === 401) throw new Error('Demo session expired. Start a new demo.');
     if (response.status === 429) throw new Error('Too many demo sessions. Try again later.');
-    throw new Error(\`Demo request failed (HTTP \${response.status}). Check that the backend is running.\`);
+    throw new Error('Demo request failed (HTTP ' + response.status + '). Check that the backend is running.');
   }
   return response.json() as Promise<T>;
 }
