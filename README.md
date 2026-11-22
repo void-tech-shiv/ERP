@@ -31,3 +31,29 @@ We need authorized, **redacted** Network request/response samples for:
 **Never commit or share student passwords, cookies, CSRF tokens, or unredacted personal attendance records.**
 
 This is a third-party prototype and is not affiliated with or endorsed by KL University. University authorization and a security/privacy review are required before public student login is enabled.
+
+
+## Running Phase 1
+
+Backend (Python 3.11+):
+
+```bash
+cd backend
+python -m venv .venv
+# activate the environment
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+pytest -q
+```
+
+Frontend (Node.js 20+):
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://localhost:3000. Backend API docs: http://localhost:8000/api/docs.
+
+Demo subject records are sample data, not from NewERP. Recovery/bunk estimates assume future classes all belong to one selected LTPS component and do not guarantee university eligibility.
