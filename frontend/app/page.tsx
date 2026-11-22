@@ -173,8 +173,8 @@ export default function Home() {
           </section></div>}
 
         {tab==='integration'&&<div className="integration-card panel">
-          <div className="integration-icon"><LockKeyhole size={30}/></div><h2>Secure ERP sync is coming next</h2>
-          <p>Login, CAPTCHA handling and attendance fetching are intentionally disabled until the real university session flow has been validated and permission requirements reviewed.</p>
+          <div className="integration-icon"><LockKeyhole size={30}/></div><h2>ERP session engine: internal testing</h2>
+          <p>A backend session engine now handles CAPTCHA, student-specific cookies, login verification and attendance extraction in offline tests. Live student login remains disabled until university authorization and end-to-end validation.</p>
           <div className="steps">
             <div><span>01</span><strong>Student solves ERP CAPTCHA</strong><small>The image and login belong to the same isolated backend session.</small></div>
             <div><span>02</span><strong>Backend reads LTPS counts</strong><small>Only the authenticated student's Attendance Register is requested.</small></div>
