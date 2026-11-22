@@ -204,3 +204,59 @@ university credential forms based on this demo scaffold.
 working copy. A production-mode smoke test confirmed the cookie security
 flags and Origin requirement. The complete Next.js build and GitHub CI
 status have not yet been verified.
+
+## Private Vercel test deployment (November 2026)
+
+A new Vercel project is linked to this repository with root directory
+`frontend`. The Next.js app now implements its **own** serverless API routes;
+it no longer rewrites `/api/*` to `127.0.0.1:8000`, which would break
+remote deployments. The FastAPI code remains in `backend/` as an independent
+offline integration harness.
+
+**Protection**: Vercel Authentication is enabled for all deployments.
+The real-ERP endpoints are enabled only if:
+1. `ERP_PRIVATE_TEST_ENABLED=1` is configured for the preview environment;
+2. The execution environment is **not production**; and
+3. The deployment has `ERP_SESSION_SECRET` configured as a random 64-character
+   hexadecimal secret (32 bytes) in Vercel's encrypted project settings.
+
+Do not add the secret to source code or commit it in an .env file.
+The production deployment refuses real ERP login even if someone visits
+`/private-test`.
+
+Navigate to `/private-test` **on the Vercel preview URL**, sign into the Vercel
+team authentication gate, and test only your own legitimate ERP account.
+The private workflow is:
+
+`POST /api/erp/challenge` → manual CAPTCHA → `POST /api/erp/login`
+→ `GET /api/erp/terms` → `POST /api/erp/attendance` →
+`POST /api/erp/logout`.
+
+The backend uses an isolated upstream cookie jar per sealed browser session;
+the upstream ERP cookies and CSRF are encrypted with AES-256-GCM and stored
+only in a short-lived Secure, HttpOnly, SameSite=Strict cookie scoped to
+`/api/erp`. Credentials are submitted only to the official ERP endpoint,
+not stored in our database or browser localStorage. CAPTCHA solving is
+manual. The permitted upstream hostname is fixed, and redirects to unrelated
+hosts are blocked. The response is checked for the matching student ID;
+the attendance parser extracts LTPS counts, not the private Register links.
+
+After a successful sync, attendance counts are cached locally in
+IndexedDB for this student ID. Clearing the local cache on logout does not
+guarantee revocation of the university's own upstream session—its official
+logout flow has not yet been verified. Do not use the preview on public or
+shared computers.
+
+**Unverified in the real ERP**: authentication success from Vercel,
+CAPTCHA lifetime and cookies, whether the university permits third-party
+automated requests, availability of the Attendance Register across academic
+years, and long-term operation. A successful Next.js build is NOT an end-to-end
+ERP integration test. Do not share this preview with other students or
+launch a public credential flow before obtaining university approval and
+completing an independent security review.
+
+**Production blockers**: distributed session/rate-limit management, privacy
+notice, data deletion and consent UX, university authorization, end-to-end
+tests with an approved test account, upstream logout/revocation behavior and
+monitoring. The current private test uses an encrypted cookie (not Redis)
+because serverless instances cannot rely on in-memory state.
