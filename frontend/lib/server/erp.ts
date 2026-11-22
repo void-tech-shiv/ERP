@@ -69,8 +69,17 @@ export async function upstream(path: string, state: ERPState | {upstream: Record
     method, redirect: 'manual', cache: 'no-store',
     headers: {
       ...(Object.keys(state.upstream).length ? {'Cookie': upstreamCookie(state.upstream)} : {}),
-      ...(method === 'POST' ? {'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',
-                                'X-Requested-With': 'XMLHttpRequest'} : {}),
+      // Match the ordinary same-site request context of the official ERP form.
+      // Yii and front-end validation may require Origin/Referer checks.
+      ...(method === 'POST' ? {
+        'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',
+        'X-Requested-With':'XMLHttpRequest',
+        'Origin':ROOT,
+        'Referer':ROOT+'/index.php',
+        'Accept':'*/*',
+      } : {
+        'Referer':ROOT+'/index.php',
+      }),
     }, body,
     signal: AbortSignal.timeout(12000),
   });
