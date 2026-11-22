@@ -7,7 +7,11 @@ import {
   ShieldCheck, Target, WifiOff
 } from 'lucide-react';
 import { DEMO, PARTS, WEIGHTS, totals, projection, fmt, type Course, type Part } from '../lib/calculator';
-import { loadDemo, saveDemo } from '../lib/cache';
+import { loadDemo, saveDemo, clearDemo } from '../lib/cache';
+import {
+  readDemoSession, startDemoSession, endDemoSession, fetchDemoAttendance,
+  toDashboardCourses, type DemoSessionInfo
+} from '../lib/demo_session';
 
 type Tab = 'dashboard' | 'subjects' | 'planner' | 'integration';
 const NAV: {key:Tab; title:string; icon: typeof Activity}[] = [
@@ -29,20 +33,109 @@ export default function Home() {
   const [target,setTarget]=useState(85);
   const [futurePart,setFuturePart]=useState<Part>('L');
   const [cacheAt,setCacheAt]=useState<string | null>(null);
+  const [demoSession,setDemoSession]=useState<DemoSessionInfo | null>(null);
+  const [sessionStatus,setSessionStatus]=useState<'checking'|'inactive'|'active'|'error'>('checking');
+  const [sessionBusy,setSessionBusy]=useState(false);
+  const [sessionError,setSessionError]=useState<string | null>(null);
 
   useEffect(()=>{
     let active=true;
-    void loadDemo().then(data=>{
-      if(active && data){setCourses(data.courses);setCacheAt(data.savedAt)}
-    });
+    void (async()=>{
+      try {
+        const existing=await readDemoSession();
+        if(!active)return;
+        if(!existing.active){
+          setSessionStatus('inactive');
+          await clearDemo();
+          return;
+        }
+        setDemoSession(existing);
+        setSessionStatus('active');
+        const cached=await loadDemo();
+        if(active && cached){
+          setCourses(cached.courses);
+          setCacheAt(cached.savedAt);
+        }
+        const response=await fetchDemoAttendance();
+        if(active){
+          const fresh=toDashboardCourses(response);
+          setCourses(fresh);
+          setCacheAt(new Date().toISOString());
+        }
+      } catch(error) {
+        if(active){
+          setSessionStatus('error');
+          setSessionError(error instanceof Error ? error.message : 'Demo API is unreachable');
+        }
+      }
+    })();
     return ()=>{active=false};
   },[]);
-  const persist=async()=>{
-    const savedAt=new Date().toISOString();
-    await saveDemo({courses,savedAt});
-    setCacheAt(savedAt);
-  };
-  useEffect(()=>{void persist()},[courses]);
+
+  useEffect(()=>{
+    if(demoSession?.active && cacheAt){
+      void saveDemo({courses,savedAt:cacheAt});
+    }
+  },[courses,cacheAt,demoSession]);
+
+  async function refreshDemo() {
+    setSessionBusy(true);
+    setSessionError(null);
+    try {
+      const fresh=toDashboardCourses(await fetchDemoAttendance());
+      setCourses(fresh);
+      setSelected(fresh[0]?.code||'');
+      setCacheAt(new Date().toISOString());
+    } catch(error) {
+      setSessionError(error instanceof Error?error.message:'Could not refresh demo');
+      if(error instanceof Error && error.message.includes('expired')){
+        setDemoSession(null);
+        setSessionStatus('inactive');
+        setCacheAt(null);
+        await clearDemo();
+      }
+    } finally {
+      setSessionBusy(false);
+    }
+  }
+
+  async function startDemo() {
+    setSessionBusy(true);
+    setSessionError(null);
+    try {
+      const result=await startDemoSession();
+      if(!result.active)throw new Error('Demo session could not be created');
+      setDemoSession(result);
+      setSessionStatus('active');
+      const fresh=toDashboardCourses(await fetchDemoAttendance());
+      setCourses(fresh);
+      setSelected(fresh[0]?.code||'');
+      setCacheAt(new Date().toISOString());
+    } catch(error) {
+      setSessionError(error instanceof Error?error.message:'Unable to start demo');
+    } finally {
+      setSessionBusy(false);
+    }
+  }
+
+  async function logoutDemo() {
+    if(!demoSession?.active)return;
+    setSessionBusy(true);
+    setSessionError(null);
+    try {
+      await endDemoSession(demoSession.csrfToken);
+      setDemoSession(null);
+      setSessionStatus('inactive');
+      setCourses([...DEMO]);
+      setSelected(DEMO[0].code);
+      setCacheAt(null);
+      await clearDemo();
+    } catch(error) {
+      setSessionError(error instanceof Error?error.message:'Logout failed; please retry');
+    } finally {
+      setSessionBusy(false);
+    }
+  }
 
   const summary=useMemo(()=>{
     const weighted=courses.map(totals);
@@ -79,14 +172,14 @@ export default function Home() {
       <nav>{NAV.map(item=><button key={item.key} className={'nav-item '+(tab===item.key?'active':'')}
         onClick={()=>setTab(item.key)}><item.icon size={19}/><span>{item.title}</span></button>)}</nav>
       <div className="sidebar-bottom">
-        <div className="connection-note"><WifiOff size={17}/><span><strong>ERP not connected</strong><small>Demo data only</small></span></div>
+        <div className="connection-note"><WifiOff size={17}/><span><strong>{demoSession?.active?'Demo session active':'ERP not connected'}</strong><small>{demoSession?.active?'Mock records only':'No real student login'}</small></span></div>
         <div className="sidebar-foot">Independent student project<br/>Not affiliated with KL University</div>
       </div>
     </aside>
 
     <div className="workspace">
       <header className="topbar"><div className="topbar-path">Workspace <ChevronRight size={15}/> <strong>{NAV.find(n=>n.key===tab)?.title}</strong></div>
-        <div className="topbar-right"><span className="demo-pill"><span className="dot"/>DEMO MODE</span>
+        <div className="topbar-right"><span className="demo-pill"><span className="dot"/>{demoSession?.active?'DEMO SESSION':'PREVIEW MODE'}</span>
           <span className="avatar">DS</span></div>
       </header>
       <main className="content">
@@ -96,6 +189,17 @@ export default function Home() {
         </div><button className="outline-button" onClick={()=>{setCourses([...DEMO]);setSelected(DEMO[0].code)}}><RefreshCcw size={16}/> Reset demo</button></div>
 
         <div className="banner"><CircleHelp size={20}/><span><strong>Sample attendance data.</strong> This is a working calculator demo, not live KL NewERP data. ERP login and sync are not available yet.</span></div>
+        <div className="demo-actions">
+          {demoSession?.active?<>
+            <span className="session-indicator"><ShieldCheck size={16}/> Secure demo session active</span>
+            <button className="outline-button" type="button" disabled={sessionBusy} onClick={()=>{void refreshDemo()}}><RefreshCcw size={16}/> Refresh sample</button>
+            <button className="outline-button" type="button" disabled={sessionBusy} onClick={()=>{void logoutDemo()}}>End demo session</button>
+          </>:<>
+            <span className="session-indicator">{sessionStatus==='checking'?'Checking demo session…':'Local preview • ERP disconnected'}</span>
+            <button className="primary-button" type="button" disabled={sessionBusy||sessionStatus==='checking'} onClick={()=>{void startDemo()}}>Start secure demo</button>
+          </>}
+        </div>
+        {sessionError&&<p className="session-error" role="alert">{sessionError}</p>}
 
         {tab==='dashboard'&&<>
           <section className="metric-grid">
@@ -174,7 +278,7 @@ export default function Home() {
 
         {tab==='integration'&&<div className="integration-card panel">
           <div className="integration-icon"><LockKeyhole size={30}/></div><h2>ERP session engine: internal testing</h2>
-          <p>A backend session engine now handles CAPTCHA, student-specific cookies, login verification and attendance extraction in offline tests. Live student login remains disabled until university authorization and end-to-end validation.</p>
+          <p>Phase 4 adds a separate browser demo session with HttpOnly cookies, CSRF-protected logout, rate limiting and IndexedDB cleanup. The ERP session engine is tested with simulated responses; live student login stays disabled pending permission and verification.</p>
           <div className="steps">
             <div><span>01</span><strong>Student solves ERP CAPTCHA</strong><small>The image and login belong to the same isolated backend session.</small></div>
             <div><span>02</span><strong>Backend reads LTPS counts</strong><small>Only the authenticated student's Attendance Register is requested.</small></div>
