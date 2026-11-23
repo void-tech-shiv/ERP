@@ -118,6 +118,7 @@ export default function AttendanceStep({
   // Only UI preferences (nickname, year, semester and visibility) are persisted.
   // The storage key is scoped to this authenticated student account.
   useEffect(()=>{
+    setView('overview');
     let restored:StudentPreferences=DEFAULT_STUDENT_PREFERENCES;
     try{restored=readStudentPreferences(window.localStorage,studentId);}
     catch{/* Defaults work even when local storage is unavailable. */}
@@ -146,6 +147,7 @@ export default function AttendanceStep({
 
   useEffect(()=>{
     let active=true;
+    setDisplay(null);
     void readERP(studentId).then(cached=>{
       if(active&&cached&&Array.isArray(cached.courses)){
         setDisplay({...cached,cached:true});
@@ -293,7 +295,7 @@ export default function AttendanceStep({
         {view==='settings' ? <SettingsStep
           preferences={activePreferences} terms={terms} busy={busy}
           onSave={savePreferences}
-        /> : view==='overview' ? <OverviewStep
+        /> : view==='overview' ? <OverviewStep key={studentId}
           studentId={studentId} terms={terms} year={year} semester={semester}
           onYearChange={setYear} onSemesterChange={setSemester}
           nickname={activePreferences.nickname}
@@ -302,7 +304,7 @@ export default function AttendanceStep({
           onCgpaVisibilityChange={showCgpa=>savePreferences({...activePreferences,showCgpa})}
           attendance={display} attendanceBusy={busy} attendanceError={error}
           onRefreshAttendance={syncAttendance} onNavigate={setView}
-        /> : view==='cgpa' ? <CGPAStep/> : view==='seating' ? <ExamSeatingStep/> : view==='timetable' ? <TimetableStep/> : <>
+        /> : view==='cgpa' ? <CGPAStep key={studentId}/> : view==='seating' ? <ExamSeatingStep/> : view==='timetable' ? <TimetableStep/> : <>
         <div className="at-page-intro">
           <div>
             <div className="at-section-label"><span className="at-label-dot"/> PERSONAL ATTENDANCE HUB</div>
