@@ -2,7 +2,7 @@ import 'server-only';
 import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { cookies, headers } from 'next/headers';
 import { load } from 'cheerio';
-import { usesPjaxLogin, usesPjaxTimetable } from './erp_pjax';
+import { usesPjaxLogin, usesTimetableDocumentGet } from './erp_pjax';
 
 const ROOT = 'https://newerp.kluniversity.in';
 const NAME = 'attendly_private_erp';
@@ -67,7 +67,7 @@ function mergeCookies(out: Record<string,string>, res: Response) {
 }
 export async function upstream(path: string, state: ERPState | {upstream: Record<string,string>}, method = 'GET', body?: URLSearchParams | FormData) {
   const target=url(path);
-  const timetablePjax=usesPjaxTimetable(method,target);
+  const timetableDocumentGet=usesTimetableDocumentGet(method,target);
   const response = await fetch(target, {
     method, redirect: 'manual', cache: 'no-store',
     headers: {
@@ -88,15 +88,14 @@ export async function upstream(path: string, state: ERPState | {upstream: Record
         'Referer':ROOT+'/',
         'Accept':'text/html, */*; q=0.01',
       } : {
-        // The university timetable form uses Yii PJAX GET submission.
-        // Keep other GET requests (attendance/CAPTCHA/CGPA/seating) unchanged.
-        'Referer':timetablePjax
+        // The university timetable result is a browser-addressable GET page.
+        // Do not send PJAX or XHR headers for it: they can change the HTML shape.
+        // Leave all other GET routes (attendance, CGPA, seating, CAPTCHA) untouched.
+        'Referer':timetableDocumentGet
           ?ROOT+'/index.php?r=timetables%2Funiversitymasteracademictimetableview%2Findexstudentindisearch'
           :ROOT+'/',
-        ...(timetablePjax?{
-          'X-Requested-With':'XMLHttpRequest',
-          'X-PJAX':'true',
-          'Accept':'text/html, */*; q=0.01',
+        ...(timetableDocumentGet?{
+          'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         }:{})
       }),
     }, body,
