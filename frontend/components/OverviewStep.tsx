@@ -125,6 +125,9 @@ export default function OverviewStep({
       attended,conducted,
     };
   },[shownAttendance]);
+  const courseNames=useMemo(()=>new Map(
+    (shownAttendance?.courses||[]).map(course=>[course.code,course.name])
+  ),[shownAttendance]);
 
   const localDay=now?todayKey(now):null;
   const liveTimetable=timetable?.key===currentKey?timetable.value:null;
@@ -134,7 +137,7 @@ export default function OverviewStep({
   );
   const canSync=Boolean(year&&semester&&terms?.years.includes(year)&&
     terms?.semesters.includes(semester));
-  const overviewBusy=attendanceBusy||loadingTimetable;
+  const overviewBusy=attendanceBusy||loadingTimetable||cgpaLoading;
 
   async function refreshOverview(){
     if(!canSync||overviewBusy)return;
@@ -302,7 +305,8 @@ export default function OverviewStep({
                 <small>{reference||'Time unverified'}</small>
               </div>
               <div className="at-home-class-details">
-                <strong>{item.courseCode||item.raw}</strong>
+                <strong>{item.courseCode?(courseNames.get(item.courseCode)||item.courseCode):item.raw}</strong>
+                {item.courseCode&&courseNames.has(item.courseCode)&&<small>{item.courseCode}</small>}
                 <span>{item.component?LTPS_LABELS[item.component].name:'ERP class'}
                   {item.section?' · '+item.section:''}</span>
               </div>
