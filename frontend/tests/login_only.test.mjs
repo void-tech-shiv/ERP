@@ -50,13 +50,14 @@ test('academic year and semester appear immediately and terms load after verifie
   assert.equal((attendance.match(/onClick=\{\(\)=>void syncAttendance\(\)\}/g)||[]).length,1,
     'attendance must sync only from the explicit button');
 });
-test('only Attendance, CGPA and Exam Seating remain in the sidebar', () => {
+test('only Attendance, CGPA, Exam Seating and Timetable remain in the sidebar', () => {
   const sidebar=attendance.match(/<aside className="at-sidebar">([\s\S]*?)<\/aside>/)?.[1]||'';
   assert.match(sidebar,/>Attendance<\/span>/);
   assert.match(sidebar,/>CGPA<\/span>/);
   assert.match(sidebar,/>Exam Seating<\/span>/);
+  assert.match(sidebar,/>Timetable<\/span>/);
   assert.doesNotMatch(sidebar,/Overview|My subjects|Attendance planner|Stay in the know/);
-  assert.equal((sidebar.match(/at-nav-item/g)||[]).length,3);
+  assert.equal((sidebar.match(/at-nav-item/g)||[]).length,4);
 });
 test('dashboard does not show crossed-out metric cards or secondary screens', () => {
   assert.doesNotMatch(attendance,/<Metrics\s*\/>|at-metrics|at-metric-value/);
