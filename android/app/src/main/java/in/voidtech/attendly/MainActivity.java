@@ -9,43 +9,42 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 import android.view.WindowInsets;
-import android.webkit.CookieManager;
 import android.webkit.SslErrorHandler;
 import android.net.http.SslError;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
-public class MainActivity extends Activity {
-    // The same protected staging URL is used until a reviewed public release exists.
-    private static final String START_URL =
-            "https://attendly-cloudflare-preview.void-tech-shiv.workers.dev/";
-    private WebView browser;
+import java.io.IOException;
+import java.io.InputStream;
 
-    private static boolean inAppHost(String host) {
-        if (host == null) return false;
-        host = host.toLowerCase(java.util.Locale.ROOT);
-        return host.equals("attendly-cloudflare-preview.void-tech-shiv.workers.dev")
-                || host.equals("cloudflareaccess.com")
-                || host.endsWith(".cloudflareaccess.com");
-    }
+public class MainActivity extends Activity {
+    private static final String ASSET_HOST = "appassets.androidplatform.net";
+    private static final String HOME = "https://appassets.androidplatform.net/assets/index.html";
+    private WebView browser;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().setStatusBarColor(Color.rgb(247, 248, 253));
-        getWindow().setNavigationBarColor(Color.BLACK);
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        getWindow().setStatusBarColor(Color.rgb(18, 30, 49));
+        getWindow().setNavigationBarColor(Color.WHITE);
+        if (Build.VERSION.SDK_INT >= 26) {
+            getWindow().getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+        }
 
         FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(Color.rgb(246, 248, 253));
         browser = new WebView(this);
+        browser.setBackgroundColor(Color.rgb(246, 248, 253));
         root.addView(browser, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
         setContentView(root);
-
         if (Build.VERSION.SDK_INT >= 35) {
             root.setOnApplyWindowInsetsListener((v, insets) -> {
                 android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
@@ -56,31 +55,59 @@ public class MainActivity extends Activity {
         }
 
         WebView.setWebContentsDebuggingEnabled(false);
-        WebSettings options = browser.getSettings();
-        options.setJavaScriptEnabled(true);
-        options.setDomStorageEnabled(true);
-        options.setAllowFileAccess(false);
-        options.setAllowContentAccess(false);
-        options.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        options.setJavaScriptCanOpenWindowsAutomatically(false);
-        options.setSupportMultipleWindows(false);
-        if (Build.VERSION.SDK_INT >= 26) options.setSafeBrowsingEnabled(true);
-        CookieManager.getInstance().setAcceptCookie(true);
-        CookieManager.getInstance().setAcceptThirdPartyCookies(browser, true);
+        WebSettings settings = browser.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setAllowFileAccess(false);
+        settings.setAllowContentAccess(false);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        settings.setJavaScriptCanOpenWindowsAutomatically(false);
+        settings.setSupportMultipleWindows(false);
+        if (Build.VERSION.SDK_INT >= 26) settings.setSafeBrowsingEnabled(true);
 
         browser.setWebChromeClient(new WebChromeClient());
         browser.setWebViewClient(new WebViewClient() {
             @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                if (!request.isForMainFrame()) return false;
-                Uri url = request.getUrl();
-                if ("https".equalsIgnoreCase(url.getScheme()) && inAppHost(url.getHost())) {
-                    return false;
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                if (!"https".equalsIgnoreCase(uri.getScheme()) ||
+                        !ASSET_HOST.equalsIgnoreCase(uri.getHost())) return null;
+                String path = uri.getPath();
+                if (path == null || !path.startsWith("/assets/")) {
+                    return new WebResourceResponse("text/plain", "UTF-8",
+                            new java.io.ByteArrayInputStream(new byte[0]));
+                }
+                String name = path.substring("/assets/".length());
+                if (!"index.html".equals(name) &&
+                        !"styles.css".equals(name) &&
+                        !"app.js".equals(name)) {
+                    return new WebResourceResponse("text/plain", "UTF-8",
+                            new java.io.ByteArrayInputStream(new byte[0]));
                 }
                 try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, url));
+                    InputStream stream = getAssets().open(name);
+                    String mime = "index.html".equals(name) ? "text/html" :
+                            "styles.css".equals(name) ? "text/css" : "application/javascript";
+                    return new WebResourceResponse(mime, "UTF-8", stream);
+                } catch (IOException e) {
+                    return new WebResourceResponse("text/plain", "UTF-8",
+                            new java.io.ByteArrayInputStream(new byte[0]));
+                }
+            }
+
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                if (!request.isForMainFrame()) return false;
+                Uri uri = request.getUrl();
+                if ("https".equalsIgnoreCase(uri.getScheme()) &&
+                        ASSET_HOST.equalsIgnoreCase(uri.getHost())) {
+                    return false;
+                }
+                if (!"https".equalsIgnoreCase(uri.getScheme())) return true;
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, uri));
                 } catch (ActivityNotFoundException ignored) {
-                    // Never load untrusted schemes within the WebView.
+                    // Never load untrusted links inside the app.
                 }
                 return true;
             }
@@ -90,26 +117,30 @@ public class MainActivity extends Activity {
                 handler.cancel();
             }
         });
-        if (savedInstanceState == null) {
-            browser.loadUrl(START_URL);
-        } else {
-            browser.restoreState(savedInstanceState);
-        }
-    }
 
-    @Override
-    protected void onSaveInstanceState(Bundle outState) {
-        browser.saveState(outState);
-        super.onSaveInstanceState(outState);
+        if (savedInstanceState == null) browser.loadUrl(HOME);
+        else browser.restoreState(savedInstanceState);
     }
 
     @Override
     public void onBackPressed() {
-        if (browser != null && browser.canGoBack()) {
-            browser.goBack();
-        } else {
+        if (browser == null) {
             super.onBackPressed();
+            return;
         }
+        browser.evaluateJavascript(
+                "(window.attendlyBack && window.attendlyBack()) ? 'handled' : 'exit'",
+                result -> {
+                    if ("\"exit\"".equals(result)) {
+                        MainActivity.super.onBackPressed();
+                    }
+                });
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        if (browser != null) browser.saveState(outState);
+        super.onSaveInstanceState(outState);
     }
 
     @Override

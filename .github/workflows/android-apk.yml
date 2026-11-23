@@ -42,6 +42,9 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
+      - name: Validate bundled dashboard JavaScript
+        run: node --check android/app/src/main/assets/app.js
+
       - name: Assemble debug APK
         run: gradle -p android --no-daemon :app:assembleDebug
 
@@ -64,6 +67,6 @@ jobs:
           gh release create "${TAG}" \
             "android/app/build/outputs/apk/debug/app-debug.apk#Attendly-debug.apk" \
             --title "Attendly Android debug build ${GITHUB_RUN_NUMBER}" \
-            --notes "Unofficial Android debug build for testing. The app opens a Cloudflare Access-protected private ERP staging environment. Public student ERP login is not enabled. Not a Google Play release." \
+            --notes "Unofficial Android debug build for testing. Mobile dashboard with local academic data; protected ERP beta opens externally. Public university ERP login is not enabled. Not a Google Play release." \
             --prerelease \
             --target "${GITHUB_SHA}"
