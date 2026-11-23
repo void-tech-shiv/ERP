@@ -67,7 +67,7 @@ test('native shell uses private WebView session, not a credential bridge',()=>{
   const source=readFileSync(new URL('../App.tsx',import.meta.url),'utf8');
   assert.match(source,/thirdPartyCookiesEnabled=\{false\}/);
   assert.match(source,/mixedContentMode="never"/);
-  assert.match(source,/isAllowedNavigation\(request\.url,endpoint\.origin\)/);
+  assert.match(source,/isAllowedNavigation\(request\.url,endpoint\.origin,accessOrigin\)/);
   assert.match(source,/setSupportMultipleWindows=\{false\}/);
   assert.doesNotMatch(source,/AsyncStorage|SecureStore|injectedJavaScript|onMessage=/);
 });
