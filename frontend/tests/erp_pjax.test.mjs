@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { usesPjaxLogin } from '../lib/server/erp_pjax.ts';
+import { usesPjaxLogin, usesPjaxTimetable } from '../lib/server/erp_pjax.ts';
 import { readFileSync } from 'node:fs';
 
 test('official ERP login POST uses PJAX request mode',()=>{
@@ -19,5 +19,22 @@ test('external host and unexpected paths cannot enable PJAX',()=>{
 test('upstream fetch explicitly uses official PJAX header conditionally',()=>{
   const source=readFileSync(new URL('../lib/server/erp.ts',import.meta.url),'utf8');
   assert.match(source,/usesPjaxLogin\(method,url\(path\)\)/);
+  assert.match(source,/'X-PJAX':'true'/);
+});
+
+test('official timetable GET uses PJAX only for the fixed university timetable route',()=>{
+  const route='https://newerp.kluniversity.in/index.php?r=timetables%2Funiversitymasteracademictimetableview%2Findividualstudenttimetableget&UniversityMasterAcademicTimetableView%5Bacademicyear%5D=29';
+  assert.equal(usesPjaxTimetable('GET',route),true);
+  assert.equal(usesPjaxTimetable('POST',route),false);
+  assert.equal(usesPjaxTimetable('GET',route.replace('https:','http:')),false);
+  assert.equal(usesPjaxTimetable('GET',route.replace('newerp.kluniversity.in','evil.example')),false);
+  assert.equal(usesPjaxTimetable('GET','https://newerp.kluniversity.in/index.php?r=studentattendance%2Fstudentdailyattendance%2Fcourselist'),false);
+  assert.equal(usesPjaxTimetable('GET','https://newerp.kluniversity.in/index.php?r=site%2Fcaptcha'),false);
+});
+test('upstream includes browser PJAX request headers only for timetable GET',()=>{
+  const source=readFileSync(new URL('../lib/server/erp.ts',import.meta.url),'utf8');
+  assert.match(source,/usesPjaxTimetable\(method,target\)/);
+  assert.match(source,/timetablePjax\?\{/);
+  assert.match(source,/'X-Requested-With':'XMLHttpRequest'/);
   assert.match(source,/'X-PJAX':'true'/);
 });
