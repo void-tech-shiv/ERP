@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { load } from 'cheerio';
 import { resolveERPRedirect, type RedirectError } from '../../../../lib/server/erp_redirect';
 import { inspectERPPage } from '../../../../lib/server/erp_auth_verify';
-import { attendanceFormDetected, cookieTransition } from '../../../../lib/server/erp_diagnostics';
+import { cookieTransition } from '../../../../lib/server/erp_diagnostics';
 import {
   clearERPState, fail, getERPState, setERPState, testingEnabled,
   upstream, validOrigin, validateCSRF
@@ -36,8 +36,6 @@ type SafeDiagnostic = {
   cookieCountAfterLogin?: number;
   cookieChangedOnLogin?: boolean;
   cookieCountAfterDashboard?: number;
-  attendanceFormHttpStatus?: number;
-  attendanceFormAccessible?: boolean;
 };
 
 function safeResponseType(html: string): SafeDiagnostic['loginResponseType'] {
@@ -222,20 +220,6 @@ export async function POST(request:Request) {
         dashboardUrl=fixedDashboard;
         continue;
       }
-      // A private, fixed upstream probe distinguishes an unavailable
-      // authenticated attendance page from an overly strict dashboard matcher.
-      // Never expose the response, CSRF, cookies, raw URL or student details.
-      try {
-        const probe=await upstream(
-          ERP_ROOT+'/index.php?r=studentattendance%2Fstudentdailyattendance%2Fsearchgetinput',
-          state
-        );
-        diagnostic.attendanceFormHttpStatus=probe.status;
-        diagnostic.attendanceFormAccessible=probe.status===200 &&
-          attendanceFormDetected(await probe.text());
-      } catch {
-        diagnostic.attendanceFormAccessible=false;
-      }
       return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
     }
     if(!verified) return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
@@ -246,7 +230,7 @@ export async function POST(request:Request) {
     state.csrf=crypto.randomUUID();
     state.expires=Date.now()+20*60*1000;
     await setERPState(state);
-    return NextResponse.json({ok:true,studentId:username,csrfToken:state.csrf},{
+    return NextResponse.json({ok:true,verified:true,stage:'login-only',studentId:username,csrfToken:state.csrf},{
       headers:{'Cache-Control':'no-store'}
     });
   } catch {
