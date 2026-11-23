@@ -16,11 +16,13 @@ export function usesPjaxLogin(method: string, targetUrl: string): boolean {
 }
 
 
-/** The university timetable form is a GET form with data-pjax="1".
- * Mirror this first-party browser request mode only for this fixed route.
- * Never enable PJAX for arbitrary URLs or attendance/CAPTCHA requests.
+/**
+ * The student timetable results live at a browser-addressable GET URL.
+ * Use a normal document-style GET rather than forcing PJAX/XHR; the
+ * university may return a different fragment when X-PJAX is present.
+ * Restrict this special request context to the exact first-party route.
  */
-export function usesPjaxTimetable(method:string,targetUrl:string):boolean {
+export function usesTimetableDocumentGet(method:string,targetUrl:string):boolean {
   try {
     const target=new URL(targetUrl);
     return method.toUpperCase()==='GET'&&
