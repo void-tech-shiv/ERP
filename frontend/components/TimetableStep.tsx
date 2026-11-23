@@ -48,7 +48,9 @@ async function get<T>(path:string,signal?:AbortSignal):Promise<T> {
   return data as T;
 }
 
-export default function TimetableStep(){
+export default function TimetableStep({
+  currentYear='',currentSemester='',
+}:{currentYear?:string;currentSemester?:string}){
   const [terms,setTerms]=useState<Terms|null>(null);
   const [year,setYear]=useState('');
   const [semester,setSemester]=useState('');
@@ -64,12 +66,14 @@ export default function TimetableStep(){
       if(!isTerms(data))throw new Error('Invalid timetable session options from ERP.');
       if(signal?.aborted)return;
       setTerms(data);
-      setYear(old=>data.years.some(x=>x.value===old)?old:'');
-      setSemester(old=>data.semesters.some(x=>x.value===old)?old:'');
+      setYear(old=>data.years.some(x=>x.value===old)?old:
+        data.years.find(x=>x.label===currentYear)?.value||'');
+      setSemester(old=>data.semesters.some(x=>x.value===old)?old:
+        data.semesters.find(x=>x.label===currentSemester)?.value||'');
     }catch(e){
       if(!signal?.aborted)setError(e instanceof Error?e.message:'Failed to load academic sessions.');
     }finally{if(!signal?.aborted)setLoading('idle');}
-  },[]);
+  },[currentYear,currentSemester]);
 
   useEffect(()=>{
     const controller=new AbortController();
