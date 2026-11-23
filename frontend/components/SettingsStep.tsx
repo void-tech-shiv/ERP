@@ -72,7 +72,7 @@ export default function SettingsStep({preferences,terms,busy,onSave}:Props){
         <div className="at-settings-panel-head">
           <div className="at-settings-icon"><CalendarDays size={21}/></div>
           <div><h2>Current academic session</h2>
-            <p>Set the year and semester used by default in your Overview and Attendance.</p></div>
+            <p>Your saved semester automatically loads attendance and today’s classes on Overview.</p></div>
         </div>
         <div className="at-settings-term-fields">
           <label className="at-settings-label" htmlFor="at-settings-year">Academic year
@@ -92,7 +92,7 @@ export default function SettingsStep({preferences,terms,busy,onSave}:Props){
             </select>
           </label>
         </div>
-        <small>Only terms provided by your authenticated ERP are selectable. Changing your current semester does not automatically fetch new attendance records.</small>
+        <small>Only available ERP terms can be selected. After saving, Overview will automatically load this semester’s attendance and today’s timetable. You can still refresh manually.</small>
       </section>
 
       <section className="at-panel at-settings-panel">
