@@ -11,7 +11,7 @@ import { readERP, writeERP } from '../lib/erp_cache';
 import CGPAStep from './CGPAStep';
 import ExamSeatingStep from './ExamSeatingStep';
 import TimetableStep from './TimetableStep';
-import OverviewStep from './OverviewStep';
+import OverviewStep, {type OverviewTimetableCache} from './OverviewStep';
 import SettingsStep from './SettingsStep';
 import {
   DEFAULT_STUDENT_PREFERENCES, readStudentPreferences, writeStudentPreferences,
@@ -110,6 +110,9 @@ export default function AttendanceStep({
   const [loading,setLoading]=useState<Loading>('terms');
   const [error,setError]=useState('');
   const [display,setDisplay]=useState<DisplayData|null>(null);
+  const [overviewTimetable,setOverviewTimetable]=useState<
+    (OverviewTimetableCache & {studentId:string})|null
+  >(null);
   const [target,setTarget]=useState(75);
   const [preferences,setPreferences]=useState<StudentPreferences>(DEFAULT_STUDENT_PREFERENCES);
   const [preferencesForStudent,setPreferencesForStudent]=useState('');
@@ -148,6 +151,7 @@ export default function AttendanceStep({
   useEffect(()=>{
     let active=true;
     setDisplay(null);
+    setOverviewTimetable(null);
     void readERP(studentId).then(cached=>{
       if(active&&cached&&Array.isArray(cached.courses)){
         setDisplay(previous=>previous&&!previous.cached?previous:{...cached,cached:true});
@@ -318,6 +322,8 @@ export default function AttendanceStep({
             activePreferences.currentYear&&activePreferences.currentSemester&&
             activePreferences.currentYear===year&&activePreferences.currentSemester===semester
           )}
+          cachedTimetable={overviewTimetable?.studentId===studentId?overviewTimetable:null}
+          onTimetableLoaded={next=>setOverviewTimetable({...next,studentId})}
           nickname={activePreferences.nickname}
           onNicknameChange={nickname=>savePreferences({...activePreferences,nickname})}
           showCgpa={activePreferences.showCgpa}
