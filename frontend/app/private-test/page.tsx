@@ -38,6 +38,10 @@ async function call(path:string, options:RequestInit={}):Promise<any>{
       ['index-probe','dashboard-probe'].includes(details?.fallback) ? 'fallback='+details.fallback : '',
       dashStatus!==null ? 'dashboard='+dashStatus : '',
       dashboardType ? 'dashboardType='+dashboardType : '',
+      ['student-home','index','other'].includes(details?.dashboardRoute)
+        ? 'dashboardRoute='+details.dashboardRoute : '',
+      ['small','medium','large','oversize'].includes(details?.dashboardSize)
+        ? 'dashboardSize='+details.dashboardSize : '',
       typeof details?.loginFormDetected==='boolean' ? 'loginForm='+details.loginFormDetected : '',
       typeof details?.studentIdentityVisible==='boolean' ? 'identityVisible='+details.studentIdentityVisible : '',
       typeof details?.dashboardMarkersDetected==='boolean' ? 'dashboardMarkers='+details.dashboardMarkersDetected : '',
