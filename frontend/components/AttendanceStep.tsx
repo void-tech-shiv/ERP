@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BookOpen, CalendarDays, ChartNoAxesCombined, ChevronRight,
-  CircleHelp, Clock3, GraduationCap, LogOut, RefreshCw, ShieldCheck,
+  CircleHelp, Clock3, GraduationCap, LayoutDashboard, LogOut, RefreshCw, ShieldCheck,
   Target,
 } from 'lucide-react';
 import { fmt, totals, PARTS, type Course } from '../lib/calculator';
@@ -11,6 +11,7 @@ import { readERP, writeERP } from '../lib/erp_cache';
 import CGPAStep from './CGPAStep';
 import ExamSeatingStep from './ExamSeatingStep';
 import TimetableStep from './TimetableStep';
+import OverviewStep from './OverviewStep';
 
 type Terms = {years: string[]; semesters: string[]};
 type AttendanceResult = {
@@ -97,7 +98,7 @@ export default function AttendanceStep({
   loggingOut:boolean;
   logoutError?:string;
 }) {
-  const [view,setView]=useState<'attendance'|'cgpa'|'seating'|'timetable'>('attendance');
+  const [view,setView]=useState<'overview'|'attendance'|'cgpa'|'seating'|'timetable'>('overview');
   const [terms,setTerms]=useState<Terms|null>(null);
   const [year,setYear]=useState('');
   const [semester,setSemester]=useState('');
@@ -153,6 +154,15 @@ export default function AttendanceStep({
     return ()=>controller.abort();
   },[studentId,loadTerms]);
 
+  // Reuse the student's last saved attendance term only when it is still
+  // offered by the ERP. The Overview labels this as last synced, not current.
+  useEffect(()=>{
+    if(!display||!terms)return;
+    if(!terms.years.includes(display.academicYear)||!terms.semesters.includes(display.semester))return;
+    setYear(previous=>previous||display.academicYear);
+    setSemester(previous=>previous||display.semester);
+  },[display,terms]);
+
   async function syncAttendance(){
     if(!terms||!terms.years.includes(year)||!terms.semesters.includes(semester)){
       setError('Choose an academic year and semester.');
@@ -204,6 +214,11 @@ export default function AttendanceStep({
     <aside className="at-sidebar">
       <div className="at-sidebar-brand"><Logo/><small>STUDENT WORKSPACE</small></div>
       <nav className="at-side-nav" aria-label="Main navigation">
+        <button type="button" className={'at-nav-item '+(view==='overview'?'active':'')}
+          aria-current={view==='overview'?'page':undefined} onClick={()=>setView('overview')}>
+          <LayoutDashboard size={19}/><span>Overview</span>
+          {view==='overview'&&<span className="at-nav-active-dot"/>}
+        </button>
         <button type="button" className={'at-nav-item '+(view==='attendance'?'active':'')}
           aria-current={view==='attendance'?'page':undefined} onClick={()=>setView('attendance')}>
           <BookOpen size={19}/><span>Attendance</span>
@@ -230,7 +245,7 @@ export default function AttendanceStep({
     <div className="at-app-main">
       <header className="at-app-topbar">
         <div className="at-breadcrumb"><span>Workspace</span><ChevronRight size={14}/>
-          <strong>{view==='attendance'?'Attendance':view==='cgpa'?'CGPA':view==='seating'?'Exam Seating':'Timetable'}</strong></div>
+          <strong>{view==='overview'?'Overview':view==='attendance'?'Attendance':view==='cgpa'?'CGPA':view==='seating'?'Exam Seating':'Timetable'}</strong></div>
         <div className="at-top-actions">
           <span className="at-top-connected"><span className="at-online-dot"/> Connected to ERP</span>
           <div className="at-profile"><span className="at-profile-avatar"><GraduationCap size={17}/></span>
@@ -242,7 +257,12 @@ export default function AttendanceStep({
 
       <main className="at-workspace">
         {logoutError&&<div className="at-message at-message-error" role="alert">{logoutError}</div>}
-        {view==='cgpa' ? <CGPAStep/> : view==='seating' ? <ExamSeatingStep/> : view==='timetable' ? <TimetableStep/> : <>
+        {view==='overview' ? <OverviewStep
+          studentId={studentId} terms={terms} year={year} semester={semester}
+          onYearChange={setYear} onSemesterChange={setSemester}
+          attendance={display} attendanceBusy={busy} attendanceError={error}
+          onRefreshAttendance={syncAttendance} onNavigate={setView}
+        /> : view==='cgpa' ? <CGPAStep/> : view==='seating' ? <ExamSeatingStep/> : view==='timetable' ? <TimetableStep/> : <>
         <div className="at-page-intro">
           <div>
             <div className="at-section-label"><span className="at-label-dot"/> PERSONAL ATTENDANCE HUB</div>
