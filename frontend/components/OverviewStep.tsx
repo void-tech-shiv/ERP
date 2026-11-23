@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight, BookOpen, CalendarDays, Clock3, Eye, EyeOff,
   GraduationCap, MapPin, Pencil, RefreshCw, ShieldCheck, Sparkles,
@@ -21,7 +21,7 @@ type TimetablePayload={
   periods:number[];days:string[];classes:TimetableSlot[];periodsInferred:boolean;
 };
 type TimetableOptions={years:{value:string;label:string}[];semesters:{value:string;label:string}[]};
-type View='attendance'|'cgpa'|'seating'|'timetable';
+type View='attendance'|'cgpa'|'seating'|'timetable'|'settings';
 type Props={
   studentId:string;
   nickname:string;
@@ -33,6 +33,7 @@ type Props={
   semester:string;
   onYearChange:(value:string)=>void;
   onSemesterChange:(value:string)=>void;
+  autoLoadCurrentSession:boolean;
   attendance:Snapshot|null;
   attendanceBusy:boolean;
   attendanceError:string;
@@ -79,7 +80,7 @@ const todayKey=(value:Date)=>['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][value.g
 export default function OverviewStep({
   studentId,terms,year,semester,onYearChange,onSemesterChange,
   nickname,onNicknameChange,showCgpa,onCgpaVisibilityChange,
-  attendance,attendanceBusy,attendanceError,onRefreshAttendance,onNavigate,
+  autoLoadCurrentSession,attendance,attendanceBusy,attendanceError,onRefreshAttendance,onNavigate,
 }:Props){
   const [now,setNow]=useState<Date|null>(null);
   const [draftNickname,setDraftNickname]=useState('');
@@ -87,6 +88,9 @@ export default function OverviewStep({
   const [timetable,setTimetable]=useState<{key:string;value:TimetablePayload}|null>(null);
   const [loadingTimetable,setLoadingTimetable]=useState(false);
   const [timetableError,setTimetableError]=useState('');
+  const [autoCompleteKey,setAutoCompleteKey]=useState('');
+  const autoStarted=useRef(new Set<string>());
+  const refreshInFlight=useRef(false);
   const cgpaVisible=showCgpa;
   const [cgpa,setCgpa]=useState<number|null>(null);
   const [cgpaLoading,setCgpaLoading]=useState(false);
@@ -134,15 +138,17 @@ export default function OverviewStep({
   const canSync=Boolean(year&&semester&&terms?.years.includes(year)&&
     terms?.semesters.includes(semester));
   const overviewBusy=attendanceBusy||loadingTimetable||cgpaLoading;
+  const readyForCGPA=!autoLoadCurrentSession||!canSync||autoCompleteKey===currentKey;
 
-  async function refreshOverview(){
-    if(!canSync||overviewBusy)return;
+  const refreshOverview=useCallback(async()=>{
+    if(!canSync||refreshInFlight.current||attendanceBusy)return;
+    refreshInFlight.current=true;
     const requestedKey=currentKey;
-    setTimetable(null);
     setTimetableError('');
     setLoadingTimetable(true);
     try{
-      // Sequential requests avoid simultaneous upstream PHP session/cookie changes.
+      // Sequential requests avoid concurrent upstream ERP session/cookie rotations.
+      // A failed attendance request does not prevent the timetable being loaded.
       await onRefreshAttendance();
       const rawOptions=await getJson('/api/erp/timetable/terms');
       if(!isOptions(rawOptions))throw new Error('ERP returned invalid timetable session options.');
@@ -156,13 +162,27 @@ export default function OverviewStep({
       setTimetable({key:requestedKey,value:result});
     }catch(error){
       setTimetableError(error instanceof Error?error.message:'Unable to retrieve timetable.');
-    }finally{setLoadingTimetable(false);}
-  }
+    }finally{
+      refreshInFlight.current=false;
+      setAutoCompleteKey(requestedKey);
+      setLoadingTimetable(false);
+    }
+  },[canSync,attendanceBusy,currentKey,year,semester,onRefreshAttendance]);
 
-  // The sensitive CGPA is requested only after explicit Show.
+  // When Settings has a valid current semester, preload the authenticated
+  // attendance and today's timetable once per selected term on entry.
+  // The in-flight guard also prevents React StrictMode from duplicating requests.
+  useEffect(()=>{
+    if(!autoLoadCurrentSession||!canSync||attendanceBusy||
+      refreshInFlight.current||autoStarted.current.has(currentKey))return;
+    autoStarted.current.add(currentKey);
+    void refreshOverview();
+  },[autoLoadCurrentSession,canSync,attendanceBusy,currentKey,refreshOverview]);
+
+  // The sensitive CGPA is requested only if the student enabled Show.
   // Hide immediately removes it from the overview state and aborts pending fetch.
   useEffect(()=>{
-    if(!cgpaVisible)return;
+    if(!cgpaVisible||!readyForCGPA)return;
     const controller=new AbortController();
     async function fetchCGPA(){
       setCgpa(null);setCgpaError('');setCgpaLoading(true);
@@ -181,7 +201,7 @@ export default function OverviewStep({
     }
     void fetchCGPA();
     return ()=>controller.abort();
-  },[cgpaVisible,studentId]);
+  },[cgpaVisible,readyForCGPA,studentId]);
   function toggleCGPA(){
     if(cgpaVisible){setCgpa(null);setCgpaError('');setCgpaLoading(false);}
     onCgpaVisibilityChange(!cgpaVisible);
@@ -215,9 +235,13 @@ export default function OverviewStep({
     <section className="at-home-session at-panel" aria-label="Current semester selection">
       <div className="at-home-session-heading"><div>
         <div className="at-section-label">CURRENT SEMESTER</div>
-        <h2>Choose your active academic session</h2>
-        <p>Confirm the current year and semester before loading ERP records.</p>
-      </div><span className="at-home-authenticated"><ShieldCheck size={15}/> Secure ERP session</span></div>
+        <h2>Your current academic session</h2>
+        <p>Saved settings are preselected and attendance + today's timetable load automatically.</p>
+      </div><div className="at-home-session-actions">
+        <span className="at-home-authenticated"><ShieldCheck size={15}/> Secure ERP session</span>
+        <button type="button" className="at-home-edit-settings"
+          onClick={()=>onNavigate('settings')}>Edit Settings <ArrowRight size={14}/></button>
+      </div></div>
       <div className="at-home-session-fields">
         <label>Academic year
           <select value={year} onChange={event=>onYearChange(event.target.value)}
@@ -237,20 +261,24 @@ export default function OverviewStep({
           onClick={()=>void refreshOverview()}><RefreshCw size={17}/>
           {overviewBusy?'Loading…':'Refresh overview'}</button>
       </div>
-      {!canSync&&<p className="at-home-help">Select the semester you are currently attending. No term is assumed automatically.</p>}
+      {!canSync&&<p className="at-home-help">Select a year and semester, or save your current session in Settings.</p>}
+      {autoLoadCurrentSession&&loadingTimetable&&
+        <p className="at-home-help" role="status">Loading your current-semester data from ERP automatically…</p>}
     </section>
 
     <div className="at-home-stat-grid">
       <section className="at-home-stat at-home-stat--classes">
         <div className="at-home-stat-heading"><span><CalendarDays size={19}/></span>Today&apos;s classes</div>
         <strong className="at-home-stat-number">{liveTimetable&&localDay?todaySessions.length:'—'}</strong>
-        <p>{localDay?DAY_NAMES[localDay]:'Today'} · {liveTimetable?'From your ERP timetable':'Sync timetable to view'}</p>
+        <p>{localDay?DAY_NAMES[localDay]:'Today'} · {liveTimetable?'From your ERP timetable':
+          loadingTimetable?'Loading from ERP…':'Current-semester timetable'}</p>
         <button type="button" onClick={()=>onNavigate('timetable')}>Full timetable <ArrowRight size={15}/></button>
       </section>
       <section className="at-home-stat at-home-stat--attendance">
         <div className="at-home-stat-heading"><span><BookOpen size={19}/></span>Semester attendance</div>
         <strong className="at-home-stat-number">{attendanceTotals?fmt(attendanceTotals.percent):'—'}</strong>
-        <p>{shownAttendance?shownAttendance.academicYear+' · '+shownAttendance.semester:'Choose your semester and refresh'}</p>
+        <p>{shownAttendance?shownAttendance.academicYear+' · '+shownAttendance.semester:
+          loadingTimetable?'Loading current-semester attendance…':'Select your current semester'}</p>
         {attendanceTotals&&<div className="at-home-attendance-track">
           <div style={{width:Math.min(100,Math.max(0,attendanceTotals.percent||0))+'%'}}/>
         </div>}
@@ -317,8 +345,10 @@ export default function OverviewStep({
         </div>}
       {!liveTimetable&&!loadingTimetable&&
         <div className="at-home-today-empty">
-          <Clock3 size={27}/> {canSync?'Press Refresh overview to load today’s classes.':
-          'Select your current semester to see today’s classes.'}
+          <Clock3 size={27}/> {canSync?
+            (timetableError?'Could not load today’s classes. Use Refresh overview to retry.':
+              'Your current-semester timetable will load automatically.'):
+            'Select your current semester to see today’s classes.'}
         </div>}
       {liveTimetable?.periodsInferred&&<p className="at-home-timing-note">
         ERP did not provide readable period headers. Slot positions are inferred and time ranges are not verified.
