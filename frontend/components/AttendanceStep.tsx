@@ -304,7 +304,10 @@ export default function AttendanceStep({
           onCgpaVisibilityChange={showCgpa=>savePreferences({...activePreferences,showCgpa})}
           attendance={display} attendanceBusy={busy} attendanceError={error}
           onRefreshAttendance={syncAttendance} onNavigate={setView}
-        /> : view==='cgpa' ? <CGPAStep key={studentId}/> : view==='seating' ? <ExamSeatingStep/> : view==='timetable' ? <TimetableStep/> : <>
+        /> : view==='cgpa' ? <CGPAStep key={studentId}/> : view==='seating' ? <ExamSeatingStep/> : view==='timetable' ? <TimetableStep
+          currentYear={activePreferences.currentYear}
+          currentSemester={activePreferences.currentSemester}
+        /> : <>
         <div className="at-page-intro">
           <div>
             <div className="at-section-label"><span className="at-label-dot"/> PERSONAL ATTENDANCE HUB</div>
