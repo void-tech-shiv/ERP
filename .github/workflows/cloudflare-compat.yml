@@ -18,5 +18,9 @@ jobs:
           node-version: '22'
       - name: Install Next.js frontend
         run: npm install --no-audit --no-fund
-      - name: Check vinext compatibility without deploying
+      - name: Check vinext compatibility
         run: npx --yes vinext check
+      - name: Initialize Cloudflare adapter without replacing Next.js
+        run: npx --yes vinext init --platform=cloudflare --name attendly-cloudflare-preview --cdn-cache=none --data-cache=none --image-optimization=none
+      - name: Build Cloudflare Worker bundle
+        run: npm run build:vinext
