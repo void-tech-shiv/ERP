@@ -79,7 +79,7 @@ export function classifyTimetableFailure(html:string):TimetableFailure {
     return 'TT_EMPTY_RESULT';
   // Only treat a table as timetable-related when ERP actually labels the
   // result that way. Other tables can be part of its dashboard navigation.
-  if(/academic timetable|student timetable/i.test(visible)&&$('table').length)
+  if($('h1,h2,h3,h4,.card-header').toArray().some(el=>/^(academic|student) timetable$/i.test(tidy($(el).text())))&&$('table').length)
     return 'TT_TIMETABLE_HEADER_CHANGED';
   if($('table').length)
     return 'TT_UNRECOGNIZED_TABLE';
