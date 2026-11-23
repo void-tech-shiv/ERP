@@ -17,7 +17,7 @@ jobs:
         run: |
           set -euo pipefail
           BASE='https://attendly-cloudflare-preview.void-tech-shiv.workers.dev'
-          for PATHNAME in '/' '/api/erp/session' '/api/erp/terms'; do
+          for PATHNAME in '/' '/api/erp/session' '/api/erp/terms' '/api/erp/challenge' '/api/erp/login'; do
             STATUS=$(curl -sS -o /tmp/attendly-response -D /tmp/attendly-headers -w '%{http_code}' --max-time 40 "${BASE}${PATHNAME}")
             echo "Protected path ${PATHNAME} returned HTTP ${STATUS} to unauthenticated client"
             if [[ "${STATUS}" != '302' && "${STATUS}" != '303' && "${STATUS}" != '401' && "${STATUS}" != '403' ]]; then
@@ -31,4 +31,18 @@ jobs:
               fi
             fi
           done
-          echo "Cloudflare Access is protecting homepage and ERP API routes."
+          for PATHNAME in '/api/erp/challenge' '/api/erp/login'; do
+            STATUS=$(curl -sS -X POST -o /tmp/attendly-response -D /tmp/attendly-headers -w '%{http_code}' --max-time 40 "${BASE}${PATHNAME}")
+            echo "Protected POST ${PATHNAME} returned HTTP ${STATUS} to unauthenticated client"
+            if [[ "${STATUS}" != '302' && "${STATUS}" != '303' && "${STATUS}" != '401' && "${STATUS}" != '403' ]]; then
+              echo "Unexpected access to protected ERP login action"
+              exit 1
+            fi
+            if [[ "${STATUS}" == '302' || "${STATUS}" == '303' ]]; then
+              if ! grep -Eiq 'location: .*cloudflareaccess\.com|location: .*/cdn-cgi/access/' /tmp/attendly-headers; then
+                echo "Redirect target is not Cloudflare Access"
+                exit 1
+              fi
+            fi
+          done
+          echo "Cloudflare Access protects homepage, ERP API reads, and login POST requests."
