@@ -30,6 +30,8 @@ async function call(path:string, options:RequestInit={}):Promise<any>{
       postStatus!==null ? 'POST='+postStatus : '',
       type ? 'type='+type : '',
       redirectKind ? 'redirectType='+redirectKind : '',
+      ['location','pjax-url','fixed-fallback'].includes(details?.redirectSource)
+        ? 'redirectSource='+details.redirectSource : '',
       redirectReason ? 'redirectIssue='+redirectReason : '',
       details?.upgradedHttps===true ? 'httpsUpgrade=true' : '',
       followCount!==null ? 'redirectHops='+followCount : '',
