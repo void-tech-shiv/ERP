@@ -178,7 +178,7 @@ export default function AttendanceStep({
           </div>
         </article>;
       })}
-      {!courses.length && <p className="at-small-empty">No subjects match your search.</p>}
+      {!courses.length && <p className="at-small-empty">No subjects are available for this academic session.</p>}
     </div>;
   }
 
