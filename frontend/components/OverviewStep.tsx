@@ -16,10 +16,11 @@ type Snapshot={
   academicYear:string;semester:string;courses:Course[];
   savedAt:string;cached:boolean;
 };
-type TimetablePayload={
+export type TimetablePayload={
   source:'erp';academicYear:string;semester:string;
   periods:number[];days:string[];classes:TimetableSlot[];periodsInferred:boolean;
 };
+export type OverviewTimetableCache={key:string;value:TimetablePayload;loadedAt:number};
 type TimetableOptions={years:{value:string;label:string}[];semesters:{value:string;label:string}[]};
 type View='attendance'|'cgpa'|'seating'|'timetable'|'settings';
 type Props={
@@ -34,6 +35,8 @@ type Props={
   onYearChange:(value:string)=>void;
   onSemesterChange:(value:string)=>void;
   autoLoadCurrentSession:boolean;
+  cachedTimetable:OverviewTimetableCache|null;
+  onTimetableLoaded:(next:OverviewTimetableCache)=>void;
   attendance:Snapshot|null;
   attendanceBusy:boolean;
   attendanceError:string;
@@ -80,7 +83,8 @@ const todayKey=(value:Date)=>['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][value.g
 export default function OverviewStep({
   studentId,terms,year,semester,onYearChange,onSemesterChange,
   nickname,onNicknameChange,showCgpa,onCgpaVisibilityChange,
-  autoLoadCurrentSession,attendance,attendanceBusy,attendanceError,onRefreshAttendance,onNavigate,
+  autoLoadCurrentSession,cachedTimetable,onTimetableLoaded,
+  attendance,attendanceBusy,attendanceError,onRefreshAttendance,onNavigate,
 }:Props){
   const [now,setNow]=useState<Date|null>(null);
   const [draftNickname,setDraftNickname]=useState('');
@@ -130,7 +134,8 @@ export default function OverviewStep({
   ),[shownAttendance]);
 
   const localDay=now?todayKey(now):null;
-  const liveTimetable=timetable?.key===currentKey?timetable.value:null;
+  const liveTimetable=timetable?.key===currentKey?timetable.value:
+    cachedTimetable?.key===currentKey?cachedTimetable.value:null;
   const todaySessions=useMemo(()=>
     localDay&&liveTimetable?groupTimetableSessions(liveTimetable.classes,localDay):[],
     [localDay,liveTimetable]
@@ -159,7 +164,9 @@ export default function OverviewStep({
       const result=await getJson('/api/erp/timetable?'+params.toString());
       if(!isTimetable(result,year,semester))
         throw new Error('ERP returned an invalid timetable for the selected semester.');
-      setTimetable({key:requestedKey,value:result});
+      const nextCache={key:requestedKey,value:result,loadedAt:Date.now()};
+      setTimetable(nextCache);
+      onTimetableLoaded(nextCache);
     }catch(error){
       setTimetableError(error instanceof Error?error.message:'Unable to retrieve timetable.');
     }finally{
@@ -167,7 +174,7 @@ export default function OverviewStep({
       setAutoCompleteKey(requestedKey);
       setLoadingTimetable(false);
     }
-  },[canSync,attendanceBusy,currentKey,year,semester,onRefreshAttendance]);
+  },[canSync,attendanceBusy,currentKey,year,semester,onRefreshAttendance,onTimetableLoaded]);
 
   // When Settings has a valid current semester, preload the authenticated
   // attendance and today's timetable once per selected term on entry.
@@ -176,8 +183,18 @@ export default function OverviewStep({
     if(!autoLoadCurrentSession||!canSync||attendanceBusy||
       refreshInFlight.current||autoStarted.current.has(currentKey))return;
     autoStarted.current.add(currentKey);
+    // Reuse an authenticated in-memory snapshot only while it is fresh.
+    const freshTimetable=cachedTimetable?.key===currentKey&&
+      Date.now()-cachedTimetable.loadedAt<5*60*1000;
+    const freshAttendance=shownAttendance&&!shownAttendance.cached&&
+      Date.now()-new Date(shownAttendance.savedAt).getTime()<5*60*1000;
+    if(freshTimetable&&freshAttendance){
+      setAutoCompleteKey(currentKey);
+      return;
+    }
     void refreshOverview();
-  },[autoLoadCurrentSession,canSync,attendanceBusy,currentKey,refreshOverview]);
+  },[autoLoadCurrentSession,canSync,attendanceBusy,currentKey,
+    cachedTimetable,shownAttendance,refreshOverview]);
 
   // The sensitive CGPA is requested only if the student enabled Show.
   // Hide immediately removes it from the overview state and aborts pending fetch.
@@ -292,7 +309,9 @@ export default function OverviewStep({
         <strong className="at-home-stat-number" aria-live="polite">
           {!cgpaVisible?'••••':cgpaLoading?'Loading…':cgpa!==null?cgpa.toFixed(2):'—'}
         </strong>
-        <p>{cgpaVisible&&cgpa!==null?'Out of 10.00 · University ERP':'Hidden for privacy'}</p>
+        <p>{!cgpaVisible?'Hidden for privacy':cgpaLoading||!readyForCGPA?
+          'Loading CGPA from ERP…':cgpa!==null?'Out of 10.00 · University ERP':
+          cgpaError?'Could not load CGPA':'No CGPA available yet'}</p>
         <button type="button" className="at-home-visibility" aria-label={cgpaVisible?'Hide CGPA':'Show CGPA'}
           disabled={!cgpaVisible&&overviewBusy} aria-pressed={cgpaVisible} onClick={toggleCGPA}>
           {cgpaVisible?<><EyeOff size={16}/> Hide CGPA</>:<><Eye size={16}/> Show CGPA</>}
