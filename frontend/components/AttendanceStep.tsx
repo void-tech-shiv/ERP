@@ -160,19 +160,6 @@ export default function AttendanceStep({
     return ()=>{active=false};
   },[studentId]);
 
-  function changeOverviewYear(next:string){
-    setYear(next);
-    if(next&&semester&&terms?.years.includes(next)&&terms.semesters.includes(semester)){
-      savePreferences({...activePreferences,currentYear:next,currentSemester:semester});
-    }
-  }
-  function changeOverviewSemester(next:string){
-    setSemester(next);
-    if(year&&next&&terms?.years.includes(year)&&terms.semesters.includes(next)){
-      savePreferences({...activePreferences,currentYear:year,currentSemester:next});
-    }
-  }
-
   const busy=loading!=='idle';
   // Never present an old cached semester as the currently selected semester.
   const selectedDisplay=display&&display.academicYear===year&&display.semester===semester
@@ -317,7 +304,6 @@ export default function AttendanceStep({
           onSave={savePreferences}
         /> : view==='overview' ? <OverviewStep key={studentId}
           studentId={studentId} terms={terms} year={year} semester={semester}
-          onYearChange={changeOverviewYear} onSemesterChange={changeOverviewSemester}
           autoLoadCurrentSession={Boolean(
             activePreferences.currentYear&&activePreferences.currentSemester&&
             activePreferences.currentYear===year&&activePreferences.currentSemester===semester
@@ -325,7 +311,6 @@ export default function AttendanceStep({
           cachedTimetable={overviewTimetable?.studentId===studentId?overviewTimetable:null}
           onTimetableLoaded={next=>setOverviewTimetable({...next,studentId})}
           nickname={activePreferences.nickname}
-          onNicknameChange={nickname=>savePreferences({...activePreferences,nickname})}
           showCgpa={activePreferences.showCgpa}
           onCgpaVisibilityChange={showCgpa=>savePreferences({...activePreferences,showCgpa})}
           attendance={display} attendanceBusy={busy} attendanceError={error}
