@@ -47,8 +47,18 @@ export async function GET(request:NextRequest){
     const reason=error instanceof Error?error.message:'';
     if(reason==='ERP denied timetable access')
       return fail('Official ERP showed a Forbidden page [TT_FORBIDDEN_HTML]',502);
+    if(reason.startsWith('ERP timetable grid not found: TT_LOGIN_REQUIRED'))
+      return fail('ERP returned its login page. Please sign in again [TT_LOGIN_REQUIRED]',401);
+    if(reason.startsWith('ERP timetable grid not found: TT_FORBIDDEN_HTML'))
+      return fail('University ERP denied timetable access [TT_FORBIDDEN_HTML]',502);
+    if(reason.startsWith('ERP timetable grid not found: TT_SEARCH_FORM'))
+      return fail('ERP returned the search form instead of a timetable [TT_SEARCH_FORM]',502);
+    if(reason.startsWith('ERP timetable grid not found: TT_EMPTY_RESULT'))
+      return fail('ERP returned no timetable entries for this session [TT_EMPTY_RESULT]',502);
+    if(reason.startsWith('ERP timetable grid not found: TT_UNRECOGNIZED_TABLE'))
+      return fail('ERP returned a table with an unrecognized layout [TT_UNRECOGNIZED_TABLE]',502);
     if(reason.startsWith('ERP timetable grid not found'))
-      return fail('ERP responded without the timetable grid [TT_GRID_MISSING]',502);
+      return fail('ERP did not return a recognizable timetable response [TT_UNEXPECTED_RESPONSE]',502);
     if(reason.startsWith('ERP timetable day row changed')||
        reason.startsWith('Unexpected ERP timetable cell size'))
       return fail('ERP timetable layout changed [TT_LAYOUT_CHANGED]',502);
