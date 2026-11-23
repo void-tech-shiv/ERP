@@ -28,7 +28,7 @@ test('login route retains its strict authenticated dashboard verification', () =
   assert.match(login,/verified:true,stage:'login-only'/);
 });
 test('academic terms and attendance are explicitly loaded only in the authenticated dashboard', () => {
-  assert.match(attendance,/async function loadTerms\(/);
+  assert.match(attendance,/const loadTerms=useCallback\(/);
   assert.match(attendance,/async function syncAttendance\(/);
   assert.match(attendance,/api\/erp\/terms/);
   assert.match(attendance,/api\/erp\/attendance/);
@@ -50,11 +50,12 @@ test('academic year and semester appear immediately and terms load after verifie
   assert.equal((attendance.match(/onClick=\{\(\)=>void syncAttendance\(\)\}/g)||[]).length,1,
     'attendance must sync only from the explicit button');
 });
-test('only Attendance remains in the sidebar', () => {
+test('only Attendance and CGPA remain in the sidebar', () => {
   const sidebar=attendance.match(/<aside className="at-sidebar">([\s\S]*?)<\/aside>/)?.[1]||'';
   assert.match(sidebar,/>Attendance<\/span>/);
+  assert.match(sidebar,/>CGPA<\/span>/);
   assert.doesNotMatch(sidebar,/Overview|My subjects|Attendance planner|Stay in the know/);
-  assert.equal((sidebar.match(/at-nav-item/g)||[]).length,1);
+  assert.equal((sidebar.match(/at-nav-item/g)||[]).length,2);
 });
 test('dashboard does not show crossed-out metric cards or secondary screens', () => {
   assert.doesNotMatch(attendance,/<Metrics\s*\/>|at-metrics|at-metric-value/);
