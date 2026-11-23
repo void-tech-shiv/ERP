@@ -1,30 +1,34 @@
-name: Cloudflare staging smoke test
+name: Cloudflare staging security test
 on:
   push:
     branches: [attendly-cloudflare-preview]
     paths:
       - '.github/workflows/cloudflare-smoke.yml'
       - 'mobile/.env.example'
+      - 'frontend/**'
   workflow_dispatch:
 
 jobs:
-  verify-staging:
+  verify-access:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify Cloudflare homepage
+      - name: Verify Access protects homepage and ERP API before reaching Attendly
+        shell: bash
         run: |
-          set -eu
-          URL='https://attendly-cloudflare-preview.void-tech-shiv.workers.dev/'
-          curl -fsSL --retry 2 --max-time 40 "${URL}" -o homepage.html
-          if ! grep -Eiq 'attendly|Every class counts' homepage.html; then
-            echo 'Homepage did not contain Attendly branding'
-            exit 1
-          fi
-          echo 'Cloudflare staging homepage responded with Attendly content.'
-      - name: Verify unauthenticated ERP session is disabled in staging
-        run: |
-          set -eu
-          URL='https://attendly-cloudflare-preview.void-tech-shiv.workers.dev/api/erp/session'
-          STATUS=$(curl -sS -o session-response.json -w '%{http_code}' --max-time 40 "${URL}")
-          echo "Private ERP session API returned HTTP ${STATUS}"
-          test "${STATUS}" = '503'
+          set -euo pipefail
+          BASE='https://attendly-cloudflare-preview.void-tech-shiv.workers.dev'
+          for PATHNAME in '/' '/api/erp/session' '/api/erp/terms'; do
+            STATUS=$(curl -sS -o /tmp/attendly-response -D /tmp/attendly-headers -w '%{http_code}' --max-time 40 "${BASE}${PATHNAME}")
+            echo "Protected path ${PATHNAME} returned HTTP ${STATUS} to unauthenticated client"
+            if [[ "${STATUS}" != '302' && "${STATUS}" != '303' && "${STATUS}" != '401' && "${STATUS}" != '403' ]]; then
+              echo "Expected Access to block or redirect an unauthenticated request"
+              exit 1
+            fi
+            if [[ "${STATUS}" == '302' || "${STATUS}" == '303' ]]; then
+              if ! grep -Eiq 'location: .*cloudflareaccess\.com|location: .*/cdn-cgi/access/' /tmp/attendly-headers; then
+                echo "Redirect target is not Cloudflare Access"
+                exit 1
+              fi
+            fi
+          done
+          echo "Cloudflare Access is protecting homepage and ERP API routes."
