@@ -3,6 +3,7 @@ import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEq
 import { cookies, headers } from 'next/headers';
 import { load } from 'cheerio';
 import { usesPjaxLogin, usesTimetableDocumentGet } from './erp_pjax';
+import { erpRequestTimeoutMs } from './erp_transport';
 
 const ROOT = 'https://newerp.kluniversity.in';
 const NAME = 'attendly_private_erp';
@@ -99,7 +100,7 @@ export async function upstream(path: string, state: ERPState | {upstream: Record
         }:{})
       }),
     }, body,
-    signal: AbortSignal.timeout(12000),
+    signal: AbortSignal.timeout(erpRequestTimeoutMs(method,target)),
   });
   mergeCookies(state.upstream, response);
   if (response.status >= 300 && response.status < 400) return response;
