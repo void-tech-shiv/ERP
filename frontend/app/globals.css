@@ -376,3 +376,43 @@ h1,h2,h3,h4 {font-family:Manrope,system-ui,sans-serif}
 @media(prefers-reduced-motion:reduce) {
   *,*:before,*:after {scroll-behavior:auto!important;transition:none!important;animation:none!important}
 }
+
+/* Authenticated CGPA workspace: intentionally no grade data is persisted. */
+.at-cgpa-toolbar{display:flex;justify-content:space-between;align-items:center;gap:22px;margin-bottom:24px}
+.at-cgpa-toolbar h2{font-size:29px;letter-spacing:-1.1px;margin:9px 0 7px}
+.at-cgpa-toolbar p{font-size:12px;color:var(--muted);line-height:1.7}
+.at-cgpa-summary{display:grid;grid-template-columns:minmax(250px,.75fr) minmax(0,1.25fr);gap:17px;margin-bottom:30px}
+.at-cgpa-hero{min-height:225px;border-radius:17px;background:linear-gradient(142deg,#5748c9,#7d72ef);padding:30px;color:#fff;display:flex;flex-direction:column;justify-content:center;box-shadow:0 10px 25px #6555ed22}
+.at-cgpa-eyebrow{display:flex;gap:9px;align-items:center;color:#e3dfff;font-size:10px;font-weight:800;letter-spacing:1.1px}
+.at-cgpa-hero>strong{font:800 64px Manrope,sans-serif;line-height:1.3;letter-spacing:-3px;margin:10px 0}
+.at-cgpa-hero>span{font-size:11px;color:#e8e5ff}
+.at-cgpa-credits{border:1px solid var(--line);background:#fff;border-radius:17px;padding:24px}
+.at-cgpa-credits h3{font-size:15px;margin-bottom:21px}
+.at-cgpa-credit-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.at-cgpa-credit-grid>div span{display:block;font-size:11px;color:var(--muted)}
+.at-cgpa-credit-grid>div strong{display:block;font:800 25px Manrope,sans-serif;margin-top:6px}
+.at-cgpa-credits>p{margin-top:23px;color:var(--muted-dark);font-size:11px}
+.at-cgpa-credits>p strong{color:var(--ink)}
+.at-cgpa-head{margin-bottom:18px}
+.at-cgpa-head h2{font-size:17px}
+.at-cgpa-head h2 span{font-size:11px;color:var(--accent);background:var(--accent-light);padding:5px 8px;border-radius:7px;margin-left:7px}
+.at-cgpa-head p{font-size:11px;color:var(--muted);line-height:1.7;margin-top:9px}
+.at-cgpa-group{padding:0!important;overflow:hidden;margin-bottom:17px}
+.at-cgpa-group-head{display:flex;align-items:center;gap:11px;padding:19px 22px;border-bottom:1px solid var(--line);background:#fcfcff}
+.at-cgpa-group-head svg{color:var(--accent)}
+.at-cgpa-group-head strong{font-size:13px}
+.at-cgpa-group-head>span{margin-left:auto;color:var(--muted);font-size:11px}
+.at-cgpa-table-wrap{overflow-x:auto}
+.at-cgpa-table{width:100%;border-collapse:collapse;font-size:11px;min-width:570px}
+.at-cgpa-table th{text-align:left;background:#fbfcff;color:#8794aa;letter-spacing:.4px;font-weight:800;font-size:10px}
+.at-cgpa-table th,.at-cgpa-table td{padding:15px 21px;border-bottom:1px solid #edf0f6}
+.at-cgpa-table tbody tr:last-child td{border-bottom:0}
+.at-cgpa-table td{color:#5d6981}
+.at-cgpa-table td:first-child strong{display:block;color:var(--ink);font-size:11px;line-height:1.5}
+.at-cgpa-table td:first-child small{display:block;color:var(--muted);font-size:10px;margin-top:4px}
+.at-grade-badge{background:#eeecff;color:#5c4aca;border-radius:8px;font-weight:800;padding:6px 10px;display:inline-block}
+.at-cgpa-foot{margin-top:22px;display:flex;gap:12px;align-items:flex-start;color:#8190a8;font-size:11px;line-height:1.75}
+.at-cgpa-foot svg{flex:none;color:#6f63cd}
+.at-cgpa-loading{display:flex;align-items:center;gap:12px;color:#66738c;font-size:12px}
+@media(max-width:940px){.at-cgpa-summary{grid-template-columns:1fr 1fr}.at-cgpa-hero{min-height:210px;padding:23px}.at-cgpa-credits{padding:19px}}
+@media(max-width:700px){.at-cgpa-toolbar{align-items:flex-start;flex-direction:column}.at-cgpa-summary{grid-template-columns:1fr}.at-cgpa-hero{min-height:185px}.at-cgpa-hero>strong{font-size:53px}.at-cgpa-table th,.at-cgpa-table td{padding:12px}.at-cgpa-group-head{padding:17px}}
