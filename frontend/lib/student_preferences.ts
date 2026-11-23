@@ -14,7 +14,8 @@ const PREFIX='attendly:settings:v1:';
 const LEGACY_NICKNAME_PREFIX='attendly:nickname:v1:';
 
 export function sanitizeStudentPreferences(input:unknown):StudentPreferences{
-  const source=input&&typeof input==='object'?input as Partial<StudentPreferences>:{};
+  const source:Partial<StudentPreferences>=input&&typeof input==='object'
+    ?input as Partial<StudentPreferences>:{};
   const nickname=typeof source.nickname==='string'
     ?source.nickname.trim().replace(/\s+/g,' ').slice(0,32):'';
   const currentYear=typeof source.currentYear==='string'
