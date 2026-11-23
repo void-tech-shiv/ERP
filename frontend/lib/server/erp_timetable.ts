@@ -54,6 +54,34 @@ function parseCell(raw:string,day:string,period:number):TimetableClass {
   };
 }
 
+/**
+ * Only structural classifications; never expose raw ERP HTML, student names,
+ * credentials, CSRF, cookie data or arbitrary upstream text to the browser.
+ */
+export type TimetableFailure=
+  'TT_FORBIDDEN_HTML'|'TT_LOGIN_REQUIRED'|'TT_SEARCH_FORM'|
+  'TT_EMPTY_RESULT'|'TT_UNRECOGNIZED_TABLE'|'TT_UNEXPECTED_RESPONSE';
+
+export function classifyTimetableFailure(html:string):TimetableFailure {
+  const $=load(html);
+  const visible=$('body').text().replace(/\s+/g,' ').trim().slice(0,100_000);
+  if($('.site-error').length&&/forbidden|not allowed to perform this action/i.test($('.site-error').text())||
+     $('h1,h2,h3,h4,h5').toArray().some(el=>/^\s*Forbidden\s*$/i.test($(el).text()))||
+     /You are not allowed to perform this action/i.test(visible))
+    return 'TT_FORBIDDEN_HTML';
+  if($('input[name="LoginForm[password]"]').length||
+     $('form').filter((_,el)=>$(el).find('input[name="LoginForm[username]"]').length>0).length)
+    return 'TT_LOGIN_REQUIRED';
+  if($('form').filter((_,el)=>
+    $(el).find('input[name="r"]').attr('value')===TIMETABLE_RESULT_ROUTE).length)
+    return 'TT_SEARCH_FORM';
+  if(/no results found|no records found|no timetable found/i.test(visible))
+    return 'TT_EMPTY_RESULT';
+  if($('table').length)
+    return 'TT_UNRECOGNIZED_TABLE';
+  return 'TT_UNEXPECTED_RESPONSE';
+}
+
 /** Parses the actual table structure shown by KL ERP: Day, period numbers,
  * and class cells. The sample grid is used only in tests, never as live data.
  * Unrecognized cell text is preserved for display, not silently discarded.
@@ -98,6 +126,6 @@ export function parseTimetable(html:string):Timetable {
     result={days,periods,classes};
     return false;
   });
-  if(!result)throw new Error('ERP timetable grid not found (response may be expired or unavailable)');
+  if(!result)throw new Error('ERP timetable grid not found: '+classifyTimetableFailure(html));
   return result;
 }
