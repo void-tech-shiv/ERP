@@ -75,7 +75,9 @@ test('Settings is wired into sidebar and Overview via shared props',()=>{
   assert.match(shell,/onSave=\{savePreferences\}/);
   assert.match(shell,/nickname=\{activePreferences\.nickname\}/);
   assert.match(shell,/showCgpa=\{activePreferences\.showCgpa\}/);
-  assert.match(shell,/onNicknameChange=\{nickname=>savePreferences/);
+  assert.doesNotMatch(shell,/onNicknameChange=\{nickname=>savePreferences/);
+  assert.match(overview,/nickname\|\|'Student'/);
+  assert.doesNotMatch(overview,/editingNickname|onNicknameChange/);
   assert.match(shell,/onCgpaVisibilityChange=\{showCgpa=>savePreferences/);
   assert.match(timetable,/currentYear=''/);
   assert.match(timetable,/data\.years\.find\(x=>x\.label===currentYear\)/);
