@@ -37,7 +37,9 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
 function isCount(x: unknown): x is { attended: number; conducted: number } {
   if (!x || typeof x !== 'object') return false;
   const value = x as { attended?: unknown; conducted?: unknown };
-  return Number.isSafeInteger(value.attended) &&
+  return typeof value.attended === 'number' &&
+    typeof value.conducted === 'number' &&
+    Number.isSafeInteger(value.attended) &&
     Number.isSafeInteger(value.conducted) &&
     (value.attended as number) >= 0 &&
     (value.conducted as number) >= (value.attended as number);
