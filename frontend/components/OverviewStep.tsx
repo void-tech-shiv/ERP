@@ -24,6 +24,10 @@ type TimetableOptions={years:{value:string;label:string}[];semesters:{value:stri
 type View='attendance'|'cgpa'|'seating'|'timetable';
 type Props={
   studentId:string;
+  nickname:string;
+  onNicknameChange:(name:string)=>void;
+  showCgpa:boolean;
+  onCgpaVisibilityChange:(value:boolean)=>void;
   terms:Terms|null;
   year:string;
   semester:string;
@@ -74,41 +78,33 @@ const todayKey=(value:Date)=>['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][value.g
 
 export default function OverviewStep({
   studentId,terms,year,semester,onYearChange,onSemesterChange,
+  nickname,onNicknameChange,showCgpa,onCgpaVisibilityChange,
   attendance,attendanceBusy,attendanceError,onRefreshAttendance,onNavigate,
 }:Props){
   const [now,setNow]=useState<Date|null>(null);
-  const [nickname,setNickname]=useState('');
   const [draftNickname,setDraftNickname]=useState('');
   const [editingNickname,setEditingNickname]=useState(false);
   const [timetable,setTimetable]=useState<{key:string;value:TimetablePayload}|null>(null);
   const [loadingTimetable,setLoadingTimetable]=useState(false);
   const [timetableError,setTimetableError]=useState('');
-  const [cgpaVisible,setCgpaVisible]=useState(false);
+  const cgpaVisible=showCgpa;
   const [cgpa,setCgpa]=useState<number|null>(null);
   const [cgpaLoading,setCgpaLoading]=useState(false);
   const [cgpaError,setCgpaError]=useState('');
 
-  // A nickname is optional, user-entered, and saved on this browser only.
-  // No ERP credentials, attendance, timetable, or grade details are stored here.
+  // Preferences are owned by the authenticated workspace and shared with Settings.
   useEffect(()=>{
     setNow(new Date());
-    // The 'Today' card follows the student's local calendar if the tab remains open.
     const clock=window.setInterval(()=>setNow(new Date()),60_000);
-    try{
-      const value=window.localStorage.getItem('attendly:nickname:v1:'+studentId)||'';
-      const safe=value.trim().slice(0,32);
-      setNickname(safe);setDraftNickname(safe);
-    }catch{setNickname('');setDraftNickname('');}
     return ()=>window.clearInterval(clock);
   },[studentId]);
+  useEffect(()=>setDraftNickname(nickname),[nickname]);
+
   function saveNickname(){
     const safe=draftNickname.trim().replace(/\s+/g,' ').slice(0,32);
-    setNickname(safe);setDraftNickname(safe);setEditingNickname(false);
-    try{
-      const key='attendly:nickname:v1:'+studentId;
-      if(safe)window.localStorage.setItem(key,safe);
-      else window.localStorage.removeItem(key);
-    }catch{/* Browser storage might be disabled. Nickname still works this session. */}
+    onNicknameChange(safe);
+    setDraftNickname(safe);
+    setEditingNickname(false);
   }
 
   const currentKey=year+'|'+semester;
@@ -185,10 +181,10 @@ export default function OverviewStep({
     }
     void fetchCGPA();
     return ()=>controller.abort();
-  },[cgpaVisible]);
+  },[cgpaVisible,studentId]);
   function toggleCGPA(){
-    if(cgpaVisible){setCgpaVisible(false);setCgpa(null);setCgpaError('');setCgpaLoading(false);}
-    else setCgpaVisible(true);
+    if(cgpaVisible){setCgpa(null);setCgpaError('');setCgpaLoading(false);}
+    onCgpaVisibilityChange(!cgpaVisible);
   }
 
   return <div className="at-home-overview">
