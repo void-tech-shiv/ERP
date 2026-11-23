@@ -27,15 +27,14 @@ test('does not preload a missing, invalid, or unsaved academic term',()=>{
   assert.match(workspace,/setSemester\(restored\.currentSemester\)/);
 });
 
-test('edits on Overview save back to student-specific Settings, not just local form state',()=>{
-  assert.match(workspace,/function changeOverviewYear\(next:string\)/);
-  assert.match(workspace,/function changeOverviewSemester\(next:string\)/);
-  assert.match(workspace,/savePreferences\(\{\.\.\.activePreferences,currentYear:next,currentSemester:semester\}\)/);
-  assert.match(workspace,/savePreferences\(\{\.\.\.activePreferences,currentYear:year,currentSemester:next\}\)/);
+test('Overview shows only the saved nickname, year and semester; Settings owns editing',()=>{
   assert.match(workspace,/writeStudentPreferences\(window\.localStorage,studentId,clean\)/);
-  assert.match(overview,/onNicknameChange\(safe\)/);
-  assert.match(workspace,/onNicknameChange=\{nickname=>savePreferences/);
+  assert.match(overview,/nickname\|\|'Student'/);
+  assert.match(overview,/\{year\|\|'Not configured'\}/);
+  assert.match(overview,/\{semester\|\|'Not configured'\}/);
   assert.match(overview,/onNavigate\('settings'\)/);
+  assert.doesNotMatch(overview,/<select|onYearChange|onSemesterChange|onNicknameChange|editingNickname/);
+  assert.doesNotMatch(workspace,/function changeOverviewYear|function changeOverviewSemester/);
 });
 
 test('preloaded timetable is only reused for current student, term and recent successful data',()=>{
