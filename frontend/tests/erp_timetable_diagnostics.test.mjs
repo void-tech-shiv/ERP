@@ -24,6 +24,10 @@ test('classifies empty and unfamiliar results without exposing ERP response',()=
   assert.equal(classifyTimetableFailure('<p>No results found</p>'),'TT_EMPTY_RESULT');
   assert.equal(classifyTimetableFailure('<table><tr><th>Name</th></tr><tr><td>private test value</td></tr></table>'),'TT_UNRECOGNIZED_TABLE');
   assert.equal(classifyTimetableFailure('<div>ERP welcome</div>'),'TT_UNEXPECTED_RESPONSE');
+  assert.equal(classifyTimetableFailure('<h3>Academic Timetable</h3><table><tr><th>Period</th></tr></table>'),
+    'TT_TIMETABLE_HEADER_CHANGED');
+  assert.equal(classifyTimetableFailure('<nav>Student Timetable</nav><table><tr><th>Notice</th></tr></table>'),
+    'TT_UNRECOGNIZED_TABLE');
   const text=String(()=>{});
   assert.doesNotMatch(JSON.stringify({
     code:classifyTimetableFailure('<table><tr><th>Name</th></tr><tr><td>PRIVATE-STUDENT-123</td></tr></table>'),
@@ -31,7 +35,7 @@ test('classifies empty and unfamiliar results without exposing ERP response',()=
 });
 test('API maps structural errors to fixed safe codes instead of generic TT_GRID_MISSING',()=>{
   const route=readFileSync(new URL('../app/api/erp/timetable/route.ts',import.meta.url),'utf8');
-  for(const code of ['TT_LOGIN_REQUIRED','TT_FORBIDDEN_HTML','TT_SEARCH_FORM','TT_EMPTY_RESULT','TT_UNRECOGNIZED_TABLE','TT_UNEXPECTED_RESPONSE'])
+  for(const code of ['TT_LOGIN_REQUIRED','TT_FORBIDDEN_HTML','TT_SEARCH_FORM','TT_EMPTY_RESULT','TT_UNRECOGNIZED_TABLE','TT_TIMETABLE_HEADER_CHANGED','TT_UNEXPECTED_RESPONSE'])
     assert.match(route,new RegExp(code));
   assert.doesNotMatch(route,/return fail\(reason|return NextResponse\.json\(\{.*html/);
 });
