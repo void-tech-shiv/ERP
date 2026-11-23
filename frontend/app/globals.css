@@ -416,3 +416,54 @@ h1,h2,h3,h4 {font-family:Manrope,system-ui,sans-serif}
 .at-cgpa-loading{display:flex;align-items:center;gap:12px;color:#66738c;font-size:12px}
 @media(max-width:940px){.at-cgpa-summary{grid-template-columns:1fr 1fr}.at-cgpa-hero{min-height:210px;padding:23px}.at-cgpa-credits{padding:19px}}
 @media(max-width:700px){.at-cgpa-toolbar{align-items:flex-start;flex-direction:column}.at-cgpa-summary{grid-template-columns:1fr}.at-cgpa-hero{min-height:185px}.at-cgpa-hero>strong{font-size:53px}.at-cgpa-table th,.at-cgpa-table td{padding:12px}.at-cgpa-group-head{padding:17px}}
+
+
+/* Exam seating: responsive listing from the authenticated ERP account. */
+.at-seating-heading{display:flex;justify-content:space-between;align-items:center;gap:18px;margin:0 0 25px}
+.at-seating-heading h1{font-size:30px;letter-spacing:-1.2px;margin:10px 0 7px}
+.at-seating-heading p{color:var(--muted);font-size:12px;line-height:1.8}
+.at-seating-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:20px}
+.at-seating-stats>div{display:flex;flex-direction:column;min-height:126px;padding:21px 23px;background:#fff;border:1px solid var(--line);border-radius:15px}
+.at-seating-stats>div>span{color:#8290a7;font-weight:800;font-size:11px}
+.at-seating-stats>div>strong{font:800 31px/1.3 Manrope,system-ui,sans-serif;letter-spacing:-.9px;margin:9px 0 4px}
+.at-seating-stats>div>small{font-size:10px;color:#9ba6b9}
+.at-seating-panel{padding:0!important;overflow:hidden}
+.at-seating-panel-head{padding:24px 24px 0;align-items:center;flex-wrap:wrap}
+.at-seating-filters{display:inline-flex;gap:4px;background:#f4f4fb;padding:4px;border-radius:10px}
+.at-seating-filters button{background:transparent;border:0;border-radius:8px;padding:9px 13px;font-size:11px;font-weight:800;color:#8490a4}
+.at-seating-filters button.active{background:#fff;box-shadow:0 1px 5px #4b52781a;color:var(--accent)}
+.at-seating-filters button:hover:not(.active){color:var(--accent)}
+.at-seating-table-wrap{width:100%;overflow-x:auto}
+.at-seating-table{border-collapse:collapse;width:100%;min-width:700px}
+.at-seating-table th,.at-seating-table td{padding:18px 22px;text-align:left;border-bottom:1px solid #edf0f6}
+.at-seating-table th{background:#fafbfe;color:#8c97a9;letter-spacing:.4px;font-size:10px;font-weight:800;white-space:nowrap}
+.at-seating-table td{font-size:12px;color:#64728a}
+.at-seating-table tbody tr:last-child td{border-bottom:0}
+.at-seating-table tbody tr:hover{background:#fdfcff}
+.at-seating-date{display:flex;gap:9px;align-items:center;white-space:nowrap}
+.at-seating-date svg{color:#8277ee}
+.at-seating-date strong{font-size:11px;color:var(--ink)}
+.at-seating-table td:first-child small{display:block;padding:7px 0 0 25px;font-size:10px;color:#a0aab9}
+.at-seating-course{display:inline-flex;align-items:center;gap:8px;font-weight:800;color:#39435e;white-space:nowrap;font-size:11px}
+.at-seating-course svg{color:#9c9be4}
+.at-seating-slot{display:inline-flex;align-items:center;gap:6px;background:#f3f1ff;border-radius:8px;padding:7px 10px;color:#5d50be;font-weight:800;font-size:11px}
+.at-seating-room{display:inline-flex;align-items:center;gap:8px;color:#158a70;background:#eaf9f2;border-radius:9px;padding:8px 11px;font-weight:800;font-size:12px}
+.at-seating-empty{text-align:center;padding:60px 24px;display:flex;align-items:center;flex-direction:column;gap:12px}
+.at-seating-empty svg{color:var(--accent)}
+.at-seating-empty strong{font-size:14px}
+.at-seating-empty p{max-width:350px;color:var(--muted);font-size:11px;line-height:1.7}
+.at-seating-loading{display:flex;align-items:center;gap:12px;font-size:12px;color:#8290a7}
+.at-seating-notice{display:flex;align-items:flex-start;gap:12px;margin-top:20px;font-size:11px;color:#8995ac;line-height:1.8}
+.at-seating-notice svg{flex:none;color:var(--accent)}
+@media(max-width:900px){.at-seating-table th,.at-seating-table td{padding:15px 14px}.at-seating-panel-head{padding:18px 18px 0}}
+@media(max-width:620px){
+  .at-seating-heading{align-items:flex-start;flex-direction:column}
+  .at-seating-heading h1{font-size:25px}
+  .at-seating-heading .at-btn{width:100%}
+  .at-seating-stats{gap:8px}
+  .at-seating-stats>div{min-height:110px;padding:13px}
+  .at-seating-stats>div>span{font-size:9px}
+  .at-seating-stats>div>strong{font-size:23px}
+  .at-seating-stats>div>small{font-size:9px}
+  .at-seating-panel-head{gap:13px}
+}
