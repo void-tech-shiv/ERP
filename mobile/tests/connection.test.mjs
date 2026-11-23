@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { resolveAttendlyUrl, isAllowedNavigation } from '../src/connection.ts';
+import { resolveAttendlyUrl, resolveCloudflareAccessOrigin, isAllowedNavigation } from '../src/connection.ts';
 
 test('no unconfigured default URL or fake student login server',()=>{
   assert.equal(resolveAttendlyUrl(undefined,false).ok,false);
@@ -43,6 +43,26 @@ test('allows navigation only inside trusted origin with exact protocol and port'
   ])assert.equal(isAllowedNavigation(url,origin),false,url);
   assert.equal(isAllowedNavigation('about:blank',origin),true);
 });
+test('only the configured Cloudflare Access HTTPS origin can be opened for OTP login',()=>{
+  const access='https://wild-cell-527b.cloudflareaccess.com';
+  const origin='https://attendly-cloudflare-preview.void-tech-shiv.workers.dev';
+  assert.equal(resolveCloudflareAccessOrigin(access),access);
+  assert.equal(resolveCloudflareAccessOrigin(undefined),null);
+  for(const value of [
+    'https://evil.example.org',
+    'https://wild-cell-527b.cloudflareaccess.com.evil.test',
+    'http://wild-cell-527b.cloudflareaccess.com',
+    'https://fake:secret@wild-cell-527b.cloudflareaccess.com',
+    'https://wild-cell-527b.cloudflareaccess.com/steal',
+    'https://wild-cell-527b.cloudflareaccess.com?token=123',
+    'https://wild-cell-527b.cloudflareaccess.com#fragment',
+  ])assert.equal(resolveCloudflareAccessOrigin(value),null,value);
+  assert.equal(isAllowedNavigation(access+'/cdn-cgi/access/login',origin,access),true);
+  assert.equal(isAllowedNavigation(origin+'/api/erp/session',origin,access),true);
+  assert.equal(isAllowedNavigation('https://evil.example.org',origin,access),false);
+  assert.equal(isAllowedNavigation(access+'/cdn-cgi/access/login',origin),false);
+});
+
 test('native shell uses private WebView session, not a credential bridge',()=>{
   const source=readFileSync(new URL('../App.tsx',import.meta.url),'utf8');
   assert.match(source,/thirdPartyCookiesEnabled=\{false\}/);
