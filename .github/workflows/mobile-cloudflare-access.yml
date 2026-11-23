@@ -1,0 +1,26 @@
+name: Mobile Cloudflare Access safety checks
+on:
+  push:
+    branches: [attendly-cloudflare-preview]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile-cloudflare-access.yml'
+  workflow_dispatch:
+
+jobs:
+  mobile-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install mobile dependencies
+        run: npm install --no-audit --no-fund
+      - name: Verify navigation allowlist
+        run: npm test
+      - name: Typecheck Expo application
+        run: npm run typecheck
