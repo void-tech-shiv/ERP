@@ -125,8 +125,8 @@ export default function OverviewStep({
       attended,conducted,
     };
   },[shownAttendance]);
-  const courseNames=useMemo(()=>new Map(
-    (shownAttendance?.courses||[]).map(course=>[course.code,course.name])
+  const courseNames=useMemo(()=>new Map<string,string>(
+    (shownAttendance?.courses||[]).map(course=>[course.code,course.name] as const)
   ),[shownAttendance]);
 
   const localDay=now?todayKey(now):null;
