@@ -274,7 +274,8 @@ export default function OverviewStep({
           {cgpaVisible?<><EyeOff size={16}/> Hide CGPA</>:<><Eye size={16}/> Show CGPA</>}
         </button>
         {cgpaVisible&&cgpaError&&<small role="alert" className="at-home-inline-error">{cgpaError}</small>}
-        <button type="button" onClick={()=>onNavigate('cgpa')}>My CGPA details <ArrowRight size={15}/></button>
+        {cgpaVisible&&<button type="button" onClick={()=>onNavigate('cgpa')}>
+          My CGPA details <ArrowRight size={15}/></button>}
       </section>
     </div>
 
