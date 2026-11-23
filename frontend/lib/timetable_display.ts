@@ -67,7 +67,7 @@ export function groupTimetableSessions(slots:readonly TimetableSlot[],day:string
       normalized(last.section)===normalized(slot.section)&&
       normalized(last.room)===normalized(slot.room)&&
       normalized(last.raw)===normalized(slot.raw);
-    if(same){
+    if(same&&last){
       last.endPeriod=slot.period;
       last.periodCount++;
     }else{
