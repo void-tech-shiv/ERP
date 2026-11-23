@@ -76,7 +76,7 @@ test('CGPA and Attendance remain and seat data is not cached',()=>{
   assert.match(ui,/api\/erp\/seating/);
   assert.match(main,/Exam Seating/);
   assert.match(main,/view==='seating' \? <ExamSeatingStep\/>/);
-  assert.match(main,/view==='cgpa' \? <CGPAStep\/>/);
+  assert.match(main,/view==='cgpa' \? <CGPAStep key=\{studentId\}\/>/);
   assert.match(main,/api\/erp\/attendance/);
   assert.doesNotMatch(ui,/localStorage|sessionStorage|indexedDB|writeERP/);
 });
