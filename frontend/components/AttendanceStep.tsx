@@ -130,11 +130,11 @@ export default function AttendanceStep({
 
   function savePreferences(next:StudentPreferences){
     const clean=sanitizeStudentPreferences(next);
-    if(terms&&clean.currentYear&&clean.currentSemester&&
-      (!terms.years.includes(clean.currentYear)||
-       !terms.semesters.includes(clean.currentSemester)))return;
     const termChanged=clean.currentYear!==activePreferences.currentYear||
       clean.currentSemester!==activePreferences.currentSemester;
+    if(termChanged&&terms&&clean.currentYear&&clean.currentSemester&&
+      (!terms.years.includes(clean.currentYear)||
+       !terms.semesters.includes(clean.currentSemester)))return;
     setPreferences(clean);
     setPreferencesForStudent(studentId);
     if(termChanged){
