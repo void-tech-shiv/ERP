@@ -18,7 +18,8 @@ test('external host and unexpected paths cannot enable PJAX',()=>{
 });
 test('upstream fetch explicitly uses official PJAX header conditionally',()=>{
   const source=readFileSync(new URL('../lib/server/erp.ts',import.meta.url),'utf8');
-  assert.match(source,/usesPjaxLogin\(method,url\(path\)\)/);
+  assert.match(source,/usesPjaxLogin\(method,target\)/);
+  assert.match(source,/officialLoginPost \? \{'X-PJAX':'true'\}/);
   assert.match(source,/'X-PJAX':'true'/);
 });
 
@@ -41,5 +42,6 @@ test('upstream does not force PJAX/XHR for a timetable document GET',()=>{
     source.indexOf("}),",source.indexOf("export async function upstream"))+3);
   assert.doesNotMatch(getBlock,/'X-PJAX'\s*:/);
   assert.doesNotMatch(getBlock,/'X-Requested-With'\s*:/);
-  assert.match(source,/usesPjaxLogin\(method,url\(path\)\)/);
+  assert.match(source,/usesPjaxLogin\(method,target\)/);
+  assert.match(source,/officialLoginPost \? \{'X-PJAX':'true'\}/);
 });
