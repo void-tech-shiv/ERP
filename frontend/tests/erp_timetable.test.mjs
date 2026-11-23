@@ -123,7 +123,7 @@ test('backend validates the user session and fixed server-side query parameters'
 test('Timetable is available alongside existing secure Attendance, CGPA, and Exam Seating views',()=>{
   const parent=readFileSync(new URL('../components/AttendanceStep.tsx',import.meta.url),'utf8');
   const ui=readFileSync(new URL('../components/TimetableStep.tsx',import.meta.url),'utf8');
-  assert.match(parent,/view==='timetable' \? <TimetableStep\/>/);
+  assert.match(parent,/view==='timetable' \? <TimetableStep/);
   assert.match(parent,/view==='seating' \? <ExamSeatingStep\/>/);
   assert.match(parent,/view==='cgpa' \? <CGPAStep\/>/);
   assert.match(ui,/\/api\/erp\/timetable\/terms/);
