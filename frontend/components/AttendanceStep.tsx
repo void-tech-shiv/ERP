@@ -150,11 +150,24 @@ export default function AttendanceStep({
     setDisplay(null);
     void readERP(studentId).then(cached=>{
       if(active&&cached&&Array.isArray(cached.courses)){
-        setDisplay({...cached,cached:true});
+        setDisplay(previous=>previous&&!previous.cached?previous:{...cached,cached:true});
       }
     }).catch(()=>{});
     return ()=>{active=false};
   },[studentId]);
+
+  function changeOverviewYear(next:string){
+    setYear(next);
+    if(next&&semester&&terms?.years.includes(next)&&terms.semesters.includes(semester)){
+      savePreferences({...activePreferences,currentYear:next,currentSemester:semester});
+    }
+  }
+  function changeOverviewSemester(next:string){
+    setSemester(next);
+    if(year&&next&&terms?.years.includes(year)&&terms.semesters.includes(next)){
+      savePreferences({...activePreferences,currentYear:year,currentSemester:next});
+    }
+  }
 
   const busy=loading!=='idle';
   // Never present an old cached semester as the currently selected semester.
@@ -300,7 +313,11 @@ export default function AttendanceStep({
           onSave={savePreferences}
         /> : view==='overview' ? <OverviewStep key={studentId}
           studentId={studentId} terms={terms} year={year} semester={semester}
-          onYearChange={setYear} onSemesterChange={setSemester}
+          onYearChange={changeOverviewYear} onSemesterChange={changeOverviewSemester}
+          autoLoadCurrentSession={Boolean(
+            activePreferences.currentYear&&activePreferences.currentSemester&&
+            activePreferences.currentYear===year&&activePreferences.currentSemester===semester
+          )}
           nickname={activePreferences.nickname}
           onNicknameChange={nickname=>savePreferences({...activePreferences,nickname})}
           showCgpa={activePreferences.showCgpa}
