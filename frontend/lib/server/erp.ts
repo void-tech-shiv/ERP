@@ -69,6 +69,7 @@ function mergeCookies(out: Record<string,string>, res: Response) {
 export async function upstream(path: string, state: ERPState | {upstream: Record<string,string>}, method = 'GET', body?: URLSearchParams | FormData) {
   const target=url(path);
   const timetableDocumentGet=usesTimetableDocumentGet(method,target);
+  const officialLoginPost=usesPjaxLogin(method,target);
   const response = await fetch(target, {
     method, redirect: 'manual', cache: 'no-store',
     headers: {
@@ -84,7 +85,7 @@ export async function upstream(path: string, state: ERPState | {upstream: Record
         'X-Requested-With':'XMLHttpRequest',
         // Official NewERP login is handled by Yii/PJAX. Use PJAX only
         // for the login submission; attendance requests remain unchanged.
-        ...(usesPjaxLogin(method,url(path)) ? {'X-PJAX':'true'} : {}),
+        ...(officialLoginPost ? {'X-PJAX':'true'} : {}),
         'Origin':ROOT,
         'Referer':ROOT+'/',
         'Accept':'text/html, */*; q=0.01',
@@ -100,7 +101,7 @@ export async function upstream(path: string, state: ERPState | {upstream: Record
         }:{})
       }),
     }, body,
-    signal: AbortSignal.timeout(erpRequestTimeoutMs(method,target)),
+    signal: AbortSignal.timeout(erpRequestTimeoutMs(officialLoginPost)),
   });
   mergeCookies(state.upstream, response);
   if (response.status >= 300 && response.status < 400) return response;
