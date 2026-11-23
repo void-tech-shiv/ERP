@@ -184,8 +184,8 @@ export default function AttendanceStep({
     return {percent:conducted?100*attended/conducted:null};
   },[selectedDisplay]);
 
-  // Automatically load available terms once login is verified. The user's
-  // selection and the actual attendance sync remain explicit actions.
+  // Load authorized ERP term options after login; a saved current semester
+  // preloads attendance on Overview, while other sessions require explicit sync.
   const loadTerms=useCallback(async(signal?:AbortSignal)=>{
     if(signal?.aborted)return;
     setLoading('terms');setError('');
