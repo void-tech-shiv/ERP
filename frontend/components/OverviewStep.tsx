@@ -92,11 +92,14 @@ export default function OverviewStep({
   // No ERP credentials, attendance, timetable, or grade details are stored here.
   useEffect(()=>{
     setNow(new Date());
+    // The 'Today' card follows the student's local calendar if the tab remains open.
+    const clock=window.setInterval(()=>setNow(new Date()),60_000);
     try{
       const value=window.localStorage.getItem('attendly:nickname:v1:'+studentId)||'';
       const safe=value.trim().slice(0,32);
       setNickname(safe);setDraftNickname(safe);
     }catch{setNickname('');setDraftNickname('');}
+    return ()=>window.clearInterval(clock);
   },[studentId]);
   function saveNickname(){
     const safe=draftNickname.trim().replace(/\s+/g,' ').slice(0,32);
@@ -264,7 +267,7 @@ export default function OverviewStep({
         </strong>
         <p>{cgpaVisible&&cgpa!==null?'Out of 10.00 · University ERP':'Hidden for privacy'}</p>
         <button type="button" className="at-home-visibility" aria-label={cgpaVisible?'Hide CGPA':'Show CGPA'}
-          aria-pressed={cgpaVisible} onClick={toggleCGPA}>
+          disabled={!cgpaVisible&&overviewBusy} aria-pressed={cgpaVisible} onClick={toggleCGPA}>
           {cgpaVisible?<><EyeOff size={16}/> Hide CGPA</>:<><Eye size={16}/> Show CGPA</>}
         </button>
         {cgpaVisible&&cgpaError&&<small role="alert" className="at-home-inline-error">{cgpaError}</small>}
