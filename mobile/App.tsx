@@ -15,7 +15,7 @@ export default function App() {
   const endpoint=useMemo(
     ()=>resolveAttendlyUrl(process.env.EXPO_PUBLIC_ATTENDLY_URL,__DEV__),[],
   );
-  const web=useRef<WebView>(null);
+  const web=useRef<WebView<{}>>(null);
   const [canGoBack,setCanGoBack]=useState(false);
   const [loading,setLoading]=useState(true);
   const [connectionError,setConnectionError]=useState(false);
@@ -37,7 +37,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top','bottom']}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff"/>
+      <StatusBar barStyle="dark-content"/>
       <View style={styles.header}>
         <View style={styles.brand}>
           <View style={styles.brandMark}><Text style={styles.brandMarkText}>A</Text></View>
@@ -73,7 +73,7 @@ export default function App() {
         </View>
         :
         <View style={styles.browser}>
-          <WebView
+          <WebView<{}>
             ref={web}
             source={{uri:endpoint.url}}
             originWhitelist={[endpoint.origin]}
