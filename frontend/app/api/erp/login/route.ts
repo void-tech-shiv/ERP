@@ -4,6 +4,7 @@ import { resolveERPRedirect, type RedirectError } from '../../../../lib/server/e
 import { inspectERPPage } from '../../../../lib/server/erp_auth_verify';
 import { cookieTransition } from '../../../../lib/server/erp_diagnostics';
 import { buildERPLoginForm } from '../../../../lib/server/erp_login_form';
+import { classifyERPTransportError } from '../../../../lib/server/erp_transport';
 import { dashboardRouteKind, htmlSizeBand, needsDashboardProbe } from '../../../../lib/server/erp_dashboard_probe';
 import {
   clearERPState, fail, getERPState, setERPState, testingEnabled,
@@ -18,7 +19,7 @@ const ERP_ROOT='https://newerp.kluniversity.in';
 type LoginIssue =
   | 'CAPTCHA_REJECTED' | 'CREDENTIALS_REJECTED'
   | 'CSRF_OR_SESSION_REJECTED' | 'ERP_LOGIN_NOT_CONFIRMED'
-  | 'ERP_LOGIN_UNAVAILABLE';
+  | 'ERP_LOGIN_UNAVAILABLE' | 'ERP_LOGIN_TIMEOUT';
 
 type SafeDiagnostic = {
   loginHttpStatus?: number;
@@ -41,6 +42,7 @@ type SafeDiagnostic = {
   cookieCountAfterDashboard?: number;
   dashboardRoute?: 'student-home' | 'index' | 'other';
   dashboardSize?: 'small' | 'medium' | 'large' | 'oversize';
+  upstreamError?: 'timeout' | 'upstream-error';
 };
 
 function safeResponseType(html: string): SafeDiagnostic['loginResponseType'] {
@@ -59,7 +61,8 @@ function failure(issue: LoginIssue, status = 401, diagnostic?: SafeDiagnostic): 
     CREDENTIALS_REJECTED: 'The ERP returned a username or password validation error. Confirm your credentials on the official ERP.',
     CSRF_OR_SESSION_REJECTED: 'The ERP session or form verification expired. Start a new CAPTCHA session.',
     ERP_LOGIN_NOT_CONFIRMED: 'The ERP did not confirm login. The CAPTCHA may be correct; check ERP session initialization or browser-only login steps.',
-    ERP_LOGIN_UNAVAILABLE: 'The ERP login service did not provide an expected response. Please try later.',
+    ERP_LOGIN_UNAVAILABLE: 'The ERP login service could not be reached or returned an unexpected response. Please request a fresh CAPTCHA and retry.',
+    ERP_LOGIN_TIMEOUT: 'The ERP login request timed out. Request a fresh CAPTCHA and try again; the university server may be slow.',
   };
   return Response.json({
     error: messages[issue], code: issue,
@@ -110,6 +113,7 @@ export async function POST(request:Request) {
   if(!validateCSRF(state.csrf,request.headers.get('x-attendly-csrf'))) return fail('Verification request invalid',403);
   // Consume the challenge on any login attempt; no automatic retry of a failed CAPTCHA.
   await clearERPState();
+  let failureStage: SafeDiagnostic['stage']='login-post';
   try {
     if(Number(request.headers.get('content-length')||'0')>4096) return fail('Login request too large',400);
     const fields=await request.json();
@@ -136,6 +140,7 @@ export async function POST(request:Request) {
     if([301,302,303].includes(result.status)) {
       diagnostic.loginResponseType='redirect';
       diagnostic.stage='redirect';
+      failureStage='redirect';
       // The real ERP sends X-Pjax-Url rather than Location on its 302.
       // Treat it as navigation metadata, never as proof of login.
       const location=result.headers.get('location');
@@ -174,12 +179,14 @@ export async function POST(request:Request) {
     const fixedDashboard=ERP_ROOT+'/index.php?r=site%2Findexindi';
     for(let hop=0;hop<5;hop++) {
       diagnostic.stage='dashboard';
+      failureStage='dashboard';
       diagnostic.dashboardRoute=dashboardRouteKind(dashboardUrl);
       const page=await upstream(dashboardUrl,state);
       diagnostic.dashboardHttpStatus=page.status;
       diagnostic.cookieCountAfterDashboard=Object.keys(state.upstream).length;
       if([301,302,303].includes(page.status)) {
         diagnostic.stage='redirect';
+        failureStage='redirect';
         if(hop>=4) {
           diagnostic.redirectReason='too_many_redirects';
           return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
@@ -237,11 +244,16 @@ export async function POST(request:Request) {
     state.loginAction=undefined;
     state.csrf=crypto.randomUUID();
     state.expires=Date.now()+20*60*1000;
+    failureStage='session-write';
     await setERPState(state);
     return NextResponse.json({ok:true,verified:true,stage:'login-only',studentId:username,csrfToken:state.csrf},{
       headers:{'Cache-Control':'no-store'}
     });
-  } catch {
-    return failure('ERP_LOGIN_UNAVAILABLE',502);
+  } catch (error) {
+    // Only a fixed, non-sensitive failure classification is returned.
+    // Never expose the request, username, CAPTCHA, cookies, exception or stack.
+    const upstreamError=classifyERPTransportError(error);
+    return failure(upstreamError==='timeout'?'ERP_LOGIN_TIMEOUT':'ERP_LOGIN_UNAVAILABLE',
+      upstreamError==='timeout'?504:502,{stage:failureStage,upstreamError});
   }
 }
