@@ -43,7 +43,7 @@ const DAY_LABELS:Record<string,string>={
 };
 function parseCell(raw:string,day:string,period:number):TimetableClass {
   const codePart=raw.match(/^([A-Z0-9]{5,28})\s*[-–]\s*([LTPS])(?=\s*[-–]|\s|$)/i);
-  const section=raw.match(/\bS\s*-\s*\d+(?:\s*-\s*[A-Za-z0-9]+)?\b/i);
+  const section=raw.match(/\bS\s*-\s*\d+(?:\s*-\s*(?!RoomNo\b)[A-Za-z]{1,3}\d{0,3})?\b/i);
   const room=raw.match(/\bRoom\s*No\s*[-:]\s*(.+)$/i);
   return {
     day,period,raw,
