@@ -45,6 +45,10 @@ export async function GET(request:NextRequest){
     // Fixed diagnostic labels only. Never return HTML, student IDs, cookies,
     // CSRF values, redirect URLs or upstream exception details to the client.
     const reason=error instanceof Error?error.message:'';
+    // Development-only structural diagnostics: digit counts, never upstream
+    // HTML, table text, student identity, cookies, or CSRF.
+    const fingerprint=reason.match(/TT_SHAPE_T\d{1,2}_D\d{1,2}_H\d{1,2}_N\d{1,2}_P\d{1,2}_W\d{1,2}_C\d{1,2}/)?.[0];
+    const shape=process.env.NODE_ENV!=='production'&&fingerprint?' ['+fingerprint+']':'';
     if(reason==='ERP denied timetable access')
       return fail('Official ERP showed a Forbidden page [TT_FORBIDDEN_HTML]',502);
     if(reason.startsWith('ERP timetable grid not found: TT_LOGIN_REQUIRED'))
@@ -52,15 +56,15 @@ export async function GET(request:NextRequest){
     if(reason.startsWith('ERP timetable grid not found: TT_FORBIDDEN_HTML'))
       return fail('University ERP denied timetable access [TT_FORBIDDEN_HTML]',502);
     if(reason.startsWith('ERP timetable grid not found: TT_SEARCH_FORM'))
-      return fail('ERP returned the search form instead of a timetable [TT_SEARCH_FORM]',502);
+      return fail('ERP returned the search form instead of a timetable [TT_SEARCH_FORM]'+shape,502);
     if(reason.startsWith('ERP timetable grid not found: TT_EMPTY_RESULT'))
-      return fail('ERP returned no timetable entries for this session [TT_EMPTY_RESULT]',502);
+      return fail('ERP returned no timetable entries for this session [TT_EMPTY_RESULT]'+shape,502);
     if(reason.startsWith('ERP timetable grid not found: TT_TIMETABLE_HEADER_CHANGED'))
-      return fail('ERP returned a timetable page but its table headers changed [TT_TIMETABLE_HEADER_CHANGED]',502);
+      return fail('ERP returned a timetable page but its table headers changed [TT_TIMETABLE_HEADER_CHANGED]'+shape,502);
     if(reason.startsWith('ERP timetable grid not found: TT_UNRECOGNIZED_TABLE'))
-      return fail('ERP returned tables but none matched the timetable grid [TT_UNRECOGNIZED_TABLE]',502);
+      return fail('ERP returned tables but none matched the timetable grid [TT_UNRECOGNIZED_TABLE]'+shape,502);
     if(reason.startsWith('ERP timetable grid not found'))
-      return fail('ERP did not return a recognizable timetable response [TT_UNEXPECTED_RESPONSE]',502);
+      return fail('ERP did not return a recognizable timetable response [TT_UNEXPECTED_RESPONSE]'+shape,502);
     if(reason.startsWith('ERP timetable day row changed')||
        reason.startsWith('Unexpected ERP timetable cell size'))
       return fail('ERP timetable layout changed [TT_LAYOUT_CHANGED]',502);
