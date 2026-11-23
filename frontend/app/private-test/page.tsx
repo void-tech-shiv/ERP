@@ -2,6 +2,8 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import AttendanceStep from '../../components/AttendanceStep';
+import { clearERP } from '../../lib/erp_cache';
 
 
 async function call(path:string, options:RequestInit={}):Promise<any>{
@@ -142,6 +144,7 @@ export default function PrivateERPTest() {
         method:'POST',
         headers:{'X-Attendly-CSRF':csrf}
       });
+      await clearERP();
       setPassword('');
       setCaptcha('');
       setCaptchaImage('');
@@ -161,11 +164,10 @@ export default function PrivateERPTest() {
       <Link href="/">Back to demo</Link>
     </div>
     <div className="private-heading">
-      <span className="eyebrow">PRIVATE PREVIEW · LOGIN VERIFICATION ONLY</span>
-      <h1>KL ERP login verification</h1>
-      <p>First verify that your authenticated ERP session works.
-        Academic year, semester and attendance retrieval are separate steps
-        and are intentionally not requested on this screen.</p>
+      <span className="eyebrow">PRIVATE PREVIEW · REAL LTPS ATTENDANCE</span>
+      <h1>KL ERP attendance calculator</h1>
+      <p>Verify your ERP login first. In Step 2, explicitly load academic years and
+        semesters, then fetch attendance for your selected term.</p>
     </div>
     <div className="private-alert">
       <strong>Experimental private login test.</strong>
@@ -232,11 +234,12 @@ export default function PrivateERPTest() {
       <div className="private-alert">
         <strong>Step 1 completed.</strong>
         The backend verified your ERP identity on the authenticated dashboard.
-        Academic year and semester selection belong to Step 2 and are not
-        loaded by this login-only test.
+        Attendance fetching is optional. Step 2 begins only when you choose
+        to load available academic terms.
       </div>
     </section>}
-
+    {stage==='authenticated' && csrf && studentId &&
+      <AttendanceStep studentId={studentId} csrfToken={csrf}/>}
     <p className="private-foot">
       HTTP 302 and 200 responses alone do not prove login success.
       Only the verified authenticated dashboard enables the success screen.
