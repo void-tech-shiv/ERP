@@ -125,7 +125,7 @@ test('Timetable is available alongside existing secure Attendance, CGPA, and Exa
   const ui=readFileSync(new URL('../components/TimetableStep.tsx',import.meta.url),'utf8');
   assert.match(parent,/view==='timetable' \? <TimetableStep/);
   assert.match(parent,/view==='seating' \? <ExamSeatingStep\/>/);
-  assert.match(parent,/view==='cgpa' \? <CGPAStep\/>/);
+  assert.match(parent,/view==='cgpa' \? <CGPAStep key=\{studentId\}\/>/);
   assert.match(ui,/\/api\/erp\/timetable\/terms/);
   assert.match(ui,/\/api\/erp\/timetable\?/);
   assert.doesNotMatch(ui,/localStorage|sessionStorage|IndexedDB|writeERP/);
