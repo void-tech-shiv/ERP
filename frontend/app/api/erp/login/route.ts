@@ -4,6 +4,7 @@ import { resolveERPRedirect, type RedirectError } from '../../../../lib/server/e
 import { inspectERPPage } from '../../../../lib/server/erp_auth_verify';
 import { cookieTransition } from '../../../../lib/server/erp_diagnostics';
 import { buildERPLoginForm } from '../../../../lib/server/erp_login_form';
+import { dashboardRouteKind, htmlSizeBand, needsDashboardProbe } from '../../../../lib/server/erp_dashboard_probe';
 import {
   clearERPState, fail, getERPState, setERPState, testingEnabled,
   upstream, validOrigin, validateCSRF
@@ -38,6 +39,8 @@ type SafeDiagnostic = {
   cookieCountAfterLogin?: number;
   cookieChangedOnLogin?: boolean;
   cookieCountAfterDashboard?: number;
+  dashboardRoute?: 'student-home' | 'index' | 'other';
+  dashboardSize?: 'small' | 'medium' | 'large' | 'oversize';
 };
 
 function safeResponseType(html: string): SafeDiagnostic['loginResponseType'] {
@@ -171,6 +174,7 @@ export async function POST(request:Request) {
     const fixedDashboard=ERP_ROOT+'/index.php?r=site%2Findexindi';
     for(let hop=0;hop<5;hop++) {
       diagnostic.stage='dashboard';
+      diagnostic.dashboardRoute=dashboardRouteKind(dashboardUrl);
       const page=await upstream(dashboardUrl,state);
       diagnostic.dashboardHttpStatus=page.status;
       diagnostic.cookieCountAfterDashboard=Object.keys(state.upstream).length;
@@ -203,6 +207,7 @@ export async function POST(request:Request) {
       }
       if(page.status!==200) return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
       const html=await page.text();
+      diagnostic.dashboardSize=htmlSizeBand(html.length);
       const evidence=inspectERPPage(html,username);
       diagnostic.loginFormDetected=evidence.loginForm;
       diagnostic.studentIdentityVisible=evidence.identityVisible;
@@ -217,7 +222,7 @@ export async function POST(request:Request) {
       // An intermediate /index.php can render HTTP 200 rather than redirect.
       // A final probe of the *known* dashboard is safe, but only actual
       // identity evidence can make the session authenticated.
-      if(!attemptedFixedDashboard && dashboardUrl===ERP_ROOT+'/index.php') {
+      if(needsDashboardProbe(dashboardUrl,attemptedFixedDashboard)) {
         attemptedFixedDashboard=true;
         diagnostic.fallback='dashboard-probe';
         dashboardUrl=fixedDashboard;
