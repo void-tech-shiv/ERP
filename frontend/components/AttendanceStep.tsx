@@ -157,12 +157,15 @@ export default function AttendanceStep({
   },[studentId]);
 
   const busy=loading!=='idle';
+  // Never present an old cached semester as the currently selected semester.
+  const selectedDisplay=display&&display.academicYear===year&&display.semester===semester
+    ?display:null;
   const summary=useMemo(()=>{
-    const rows=(display?.courses||[]).map(totals);
+    const rows=(selectedDisplay?.courses||[]).map(totals);
     const attended=rows.reduce((sum,row)=>sum+row.a,0);
     const conducted=rows.reduce((sum,row)=>sum+row.t,0);
     return {percent:conducted?100*attended/conducted:null};
-  },[display]);
+  },[selectedDisplay]);
 
   // Automatically load available terms once login is verified. The user's
   // selection and the actual attendance sync remain explicit actions.
@@ -216,7 +219,7 @@ export default function AttendanceStep({
   }
 
   function SubjectList() {
-    const courses=display?.courses||[];
+    const courses=selectedDisplay?.courses||[];
     return <div className="at-course-list">
       {courses.map(course=>{
         const t=totals(course);
@@ -238,7 +241,7 @@ export default function AttendanceStep({
     </div>;
   }
 
-  const dateLabel=display ? new Date(display.savedAt).toLocaleString() : 'Not synced yet';
+  const dateLabel=selectedDisplay ? new Date(selectedDisplay.savedAt).toLocaleString() : 'Not synced yet';
 
   return <div className="at-app">
     <aside className="at-sidebar">
@@ -346,7 +349,7 @@ export default function AttendanceStep({
           {error&&<div className="at-message at-message-error" role="alert">{error}</div>}
         </section>
 
-        {!display && <div className="at-empty-dash">
+        {!selectedDisplay && <div className="at-empty-dash">
           <div className="at-empty-art" aria-hidden="true">
             <div className="at-empty-icon"><ChartNoAxesCombined size={36}/></div>
           </div>
@@ -356,13 +359,13 @@ export default function AttendanceStep({
 
         </div>}
 
-        {display&&<>
+        {selectedDisplay&&<>
           <div className="at-data-meta">
-            <div><span className="at-data-source"><span className="at-online-dot"/>{display.cached?'Saved on this device':'ERP attendance'}</span>
-              <span>{display.academicYear} · {display.semester}</span></div>
+            <div><span className="at-data-source"><span className="at-online-dot"/>{selectedDisplay.cached?'Saved on this device':'ERP attendance'}</span>
+              <span>{selectedDisplay.academicYear} · {selectedDisplay.semester}</span></div>
             <span><Clock3 size={14}/>{dateLabel}</span>
           </div>
-          {display.cached&&<div className="at-cache-notice"><CircleHelp size={17}/>
+          {selectedDisplay.cached&&<div className="at-cache-notice"><CircleHelp size={17}/>
             You're viewing a saved copy. Use Sync attendance to get the latest ERP records.</div>}
 
           <div className="at-overview-grid">
