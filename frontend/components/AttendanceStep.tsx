@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { fmt, totals, PARTS, type Course } from '../lib/calculator';
 import { readERP, writeERP } from '../lib/erp_cache';
+import CGPAStep from './CGPAStep';
 
 type Terms = {years: string[]; semesters: string[]};
 type AttendanceResult = {
@@ -94,6 +95,7 @@ export default function AttendanceStep({
   loggingOut:boolean;
   logoutError?:string;
 }) {
+  const [view,setView]=useState<'attendance'|'cgpa'>('attendance');
   const [terms,setTerms]=useState<Terms|null>(null);
   const [year,setYear]=useState('');
   const [semester,setSemester]=useState('');
@@ -200,17 +202,23 @@ export default function AttendanceStep({
     <aside className="at-sidebar">
       <div className="at-sidebar-brand"><Logo/><small>STUDENT WORKSPACE</small></div>
       <nav className="at-side-nav" aria-label="Main navigation">
-        <div className="at-nav-item active" aria-current="page">
+        <button type="button" className={'at-nav-item '+(view==='attendance'?'active':'')}
+          aria-current={view==='attendance'?'page':undefined} onClick={()=>setView('attendance')}>
           <BookOpen size={19}/><span>Attendance</span>
-          <span className="at-nav-active-dot"/>
-        </div>
+          {view==='attendance'&&<span className="at-nav-active-dot"/>}
+        </button>
+        <button type="button" className={'at-nav-item '+(view==='cgpa'?'active':'')}
+          aria-current={view==='cgpa'?'page':undefined} onClick={()=>setView('cgpa')}>
+          <GraduationCap size={19}/><span>CGPA</span>
+          {view==='cgpa'&&<span className="at-nav-active-dot"/>}
+        </button>
       </nav>
     </aside>
 
     <div className="at-app-main">
       <header className="at-app-topbar">
         <div className="at-breadcrumb"><span>Workspace</span><ChevronRight size={14}/>
-          <strong>Attendance</strong></div>
+          <strong>{view==='attendance'?'Attendance':'CGPA'}</strong></div>
         <div className="at-top-actions">
           <span className="at-top-connected"><span className="at-online-dot"/> Connected to ERP</span>
           <div className="at-profile"><span className="at-profile-avatar"><GraduationCap size={17}/></span>
@@ -222,6 +230,7 @@ export default function AttendanceStep({
 
       <main className="at-workspace">
         {logoutError&&<div className="at-message at-message-error" role="alert">{logoutError}</div>}
+        {view==='cgpa' ? <CGPAStep/> : <>
         <div className="at-page-intro">
           <div>
             <div className="at-section-label"><span className="at-label-dot"/> PERSONAL ATTENDANCE HUB</div>
@@ -304,6 +313,7 @@ export default function AttendanceStep({
               </div>
             </div>
 
+        </>}
         </>}
 
         <footer className="at-dashboard-footer">
