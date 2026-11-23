@@ -86,6 +86,43 @@ export function classifyTimetableFailure(html:string):TimetableFailure {
   return 'TT_UNEXPECTED_RESPONSE';
 }
 
+/**
+ * Privacy-safe structure fingerprint for support diagnostics. Reports only
+ * counts and cell widths, never table text, cells, IDs, CSRF or HTML.
+ */
+export function timetableStructureFingerprint(html:string):string {
+  if(html.length>2_000_000)return 'TT_SHAPE_OVERSIZE';
+  const $=load(html);
+  let totalTables=0,dayRows=0,dayHeaders=0,headerWidth=0;
+  let recognizedPeriods=0,dayWidth=0,maxWidth=0;
+  $('table').each((_,table)=>{
+    totalTables++;
+    if(totalTables>60)return false;
+    $(table).find('tr').each((_,row)=>{
+      const cells=$(row).children('td,th').toArray();
+      if(!cells.length)return;
+      maxWidth=Math.max(maxWidth,cells.length);
+      const label=tidy($(cells[0]).text()).replace(/\s+/g,'').toLowerCase();
+      if(/^(?:0|#)?day$/.test(label)){
+        dayHeaders++;
+        if(!headerWidth){
+          headerWidth=cells.length;
+          recognizedPeriods=cells.slice(1).filter(cell=>
+            /^(?:s|period)?\s*\d{1,2}$/i.test(tidy($(cell).text()))
+          ).length;
+        }
+      }else if(DAY_LABELS[label]){
+        dayRows++;
+        if(!dayWidth)dayWidth=cells.length;
+      }
+    });
+  });
+  const n=(count:number)=>Math.min(99,count);
+  return 'TT_SHAPE_T'+n(totalTables)+'_D'+n(dayRows)+'_H'+n(dayHeaders)+
+    '_N'+n(headerWidth)+'_P'+n(recognizedPeriods)+
+    '_W'+n(dayWidth)+'_C'+n(maxWidth);
+}
+
 /** Parses the actual table structure shown by KL ERP: Day, period numbers,
  * and class cells. The sample grid is used only in tests, never as live data.
  * Unrecognized cell text is preserved for display, not silently discarded.
@@ -143,6 +180,6 @@ export function parseTimetable(html:string):Timetable {
     result={days,periods,classes};
     return false;
   });
-  if(!result)throw new Error('ERP timetable grid not found: '+classifyTimetableFailure(html));
+  if(!result)throw new Error('ERP timetable grid not found: '+classifyTimetableFailure(html)+' '+timetableStructureFingerprint(html));
   return result;
 }
