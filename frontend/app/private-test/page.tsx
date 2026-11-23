@@ -43,7 +43,13 @@ async function call(path:string, options:RequestInit={}):Promise<any>{
       dashboardType ? 'dashboardType='+dashboardType : '',
       typeof details?.loginFormDetected==='boolean' ? 'loginForm='+details.loginFormDetected : '',
       typeof details?.studentIdentityVisible==='boolean' ? 'identityVisible='+details.studentIdentityVisible : '',
-      typeof details?.dashboardMarkersDetected==='boolean' ? 'dashboardMarkers='+details.dashboardMarkersDetected : ''
+      typeof details?.dashboardMarkersDetected==='boolean' ? 'dashboardMarkers='+details.dashboardMarkersDetected : '',
+      Number.isInteger(details?.cookieCountBefore) ? 'cookiesBefore='+details.cookieCountBefore : '',
+      Number.isInteger(details?.cookieCountAfterLogin) ? 'cookiesAfterLogin='+details.cookieCountAfterLogin : '',
+      typeof details?.cookieChangedOnLogin==='boolean' ? 'cookiesUpdated='+details.cookieChangedOnLogin : '',
+      Number.isInteger(details?.cookieCountAfterDashboard) ? 'cookiesAfterDashboard='+details.cookieCountAfterDashboard : '',
+      Number.isInteger(details?.attendanceFormHttpStatus) ? 'attendanceProbe='+details.attendanceFormHttpStatus : '',
+      typeof details?.attendanceFormAccessible==='boolean' ? 'attendanceForm='+details.attendanceFormAccessible : ''
     ].filter(Boolean).join(' · ');
     throw new Error((payload.error||'ERP request failed ('+response.status+')') +
       (safeTrace ? ' [Diagnostic: '+safeTrace+']' : ''));
