@@ -753,3 +753,8 @@ h1,h2,h3,h4 {font-family:Manrope,system-ui,sans-serif}
   .at-settings-actions{align-items:stretch;flex-direction:column}
   .at-settings-actions .at-btn{width:100%;justify-content:center}
 }
+
+/* Overview current term is read-only; edit it in Settings. */
+.at-home-session-value{min-height:45px;padding:10px 14px;border:1px solid #dee4f0;background:#f7f8fe;border-radius:10px;display:flex;flex-direction:column;justify-content:center;gap:6px;min-width:0}
+.at-home-session-value>span{font-size:10px;font-weight:800;color:#8b95ab}
+.at-home-session-value>strong{font-size:13px;font-weight:800;color:#263452;line-height:1.3}
