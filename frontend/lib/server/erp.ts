@@ -78,6 +78,9 @@ export async function upstream(path: string, state: ERPState | {upstream: Record
           'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',
         }),
         'X-Requested-With':'XMLHttpRequest',
+        // Official NewERP login is handled by Yii/PJAX. Use PJAX only
+        // for the login submission; attendance requests remain unchanged.
+        ...(url(path).includes('r=site%2Flogin') ? {'X-PJAX':'true'} : {}),
         'Origin':ROOT,
         'Referer':ROOT+'/',
         'Accept':'text/html, */*; q=0.01',
