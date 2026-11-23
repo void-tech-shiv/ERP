@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
-import { isAllowedNavigation, resolveAttendlyUrl } from './src/connection';
+import { isAllowedNavigation, resolveAttendlyUrl, resolveCloudflareAccessOrigin } from './src/connection';
 
 /**
  * Phase 1: native mobile shell around the existing Attendly site.
@@ -14,6 +14,9 @@ import { isAllowedNavigation, resolveAttendlyUrl } from './src/connection';
 export default function App() {
   const endpoint=useMemo(
     ()=>resolveAttendlyUrl(process.env.EXPO_PUBLIC_ATTENDLY_URL,__DEV__),[],
+  );
+  const accessOrigin=useMemo(
+    ()=>resolveCloudflareAccessOrigin(process.env.EXPO_PUBLIC_CLOUDFLARE_ACCESS_ORIGIN),[],
   );
   const web=useRef<WebView<{}>>(null);
   const [canGoBack,setCanGoBack]=useState(false);
@@ -76,9 +79,9 @@ export default function App() {
           <WebView<{}>
             ref={web}
             source={{uri:endpoint.url}}
-            originWhitelist={[endpoint.origin]}
+            originWhitelist={[endpoint.origin,...(accessOrigin?[accessOrigin]:[])]}
             onShouldStartLoadWithRequest={request=>
-              isAllowedNavigation(request.url,endpoint.origin)}
+              isAllowedNavigation(request.url,endpoint.origin,accessOrigin)}
             javaScriptEnabled
             domStorageEnabled
             sharedCookiesEnabled
@@ -93,7 +96,7 @@ export default function App() {
             onLoadEnd={()=>setLoading(false)}
             onNavigationStateChange={nav=>{
               setCanGoBack(nav.canGoBack);
-              if(!isAllowedNavigation(nav.url,endpoint.origin))web.current?.stopLoading();
+              if(!isAllowedNavigation(nav.url,endpoint.origin,accessOrigin))web.current?.stopLoading();
             }}
             onError={()=>{
               // Do not print native request diagnostics; URLs may be sensitive.
