@@ -9,28 +9,28 @@ const shell=readFileSync(new URL('../components/AttendanceStep.tsx',import.meta.
 const css=readFileSync(new URL('../app/globals.css',import.meta.url),'utf8');
 
 test('Overview is the default post-login tab and existing sections still work',()=>{
-  assert.match(shell,/useState<'overview'\|'attendance'\|'cgpa'\|'seating'\|'timetable'>\('overview'\)/);
+  assert.match(shell,/useState<'overview'\|'attendance'\|'cgpa'\|'seating'\|'timetable'\|'settings'>\('overview'\)/);
   assert.match(shell,/>Overview<\/span>/);
   assert.match(shell,/view==='overview' \? <OverviewStep/);
-  assert.match(shell,/view==='cgpa' \? <CGPAStep\/>/);
+  assert.match(shell,/view==='cgpa' \? <CGPAStep key=\{studentId\}\/>/);
   assert.match(shell,/view==='seating' \? <ExamSeatingStep\/>/);
-  assert.match(shell,/view==='timetable' \? <TimetableStep\/>/);
+  assert.match(shell,/view==='timetable' \? <TimetableStep/);
   assert.match(shell,/onRefreshAttendance=\{syncAttendance\}/);
 });
 test('nickname greeting is editable and only explicitly saved on this browser',()=>{
   assert.match(overview,/greeting\(now\.getHours\(\)\)/);
   assert.match(overview,/nickname\|\|'Student'/);
   assert.match(overview,/editingNickname\?/);
-  assert.match(overview,/localStorage\.setItem\(key,safe\)/);
-  assert.match(overview,/localStorage\.removeItem\(key\)/);
-  assert.match(overview,/attendly:nickname:v1:/);
+  assert.match(overview,/onNicknameChange\(safe\)/);
+  assert.match(shell,/readStudentPreferences\(window\.localStorage,studentId\)/);
+  assert.match(shell,/writeStudentPreferences\(window\.localStorage,studentId,clean\)/);
   assert.doesNotMatch(overview,/localStorage\.setItem\([^)]*(cgpa|grades|password|csrf|courses)/i);
 });
 test('CGPA is hidden by default, fetched only when Show is pressed, cleared on Hide',()=>{
-  assert.match(overview,/const \[cgpaVisible,setCgpaVisible\]=useState\(false\)/);
+  assert.match(overview,/const cgpaVisible=showCgpa/);
   assert.match(overview,/if\(!cgpaVisible\)return;/);
   assert.match(overview,/getJson\('\/api\/erp\/cgpa',controller\.signal\)/);
-  assert.match(overview,/setCgpaVisible\(false\);setCgpa\(null\)/);
+  assert.match(overview,/onCgpaVisibilityChange\(!cgpaVisible\)/);
   assert.match(overview,/aria-label=\{cgpaVisible\?'Hide CGPA':'Show CGPA'\}/);
   assert.match(overview,/\{!cgpaVisible\?'••••'/);
   assert.doesNotMatch(overview,/writeERP\(|sessionStorage\.setItem\(|IndexedDB/);
