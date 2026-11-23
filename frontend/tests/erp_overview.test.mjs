@@ -17,11 +17,11 @@ test('Overview is the default post-login tab and existing sections still work',(
   assert.match(shell,/view==='timetable' \? <TimetableStep/);
   assert.match(shell,/onRefreshAttendance=\{syncAttendance\}/);
 });
-test('nickname greeting is editable and only explicitly saved on this browser',()=>{
+test('nickname greeting reads saved Settings and cannot be edited directly on Overview',()=>{
   assert.match(overview,/greeting\(now\.getHours\(\)\)/);
   assert.match(overview,/nickname\|\|'Student'/);
-  assert.match(overview,/editingNickname\?/);
-  assert.match(overview,/onNicknameChange\(safe\)/);
+  assert.doesNotMatch(overview,/editingNickname|onNicknameChange|at-home-edit-nickname/);
+  assert.match(overview,/onNavigate\('settings'\)/);
   assert.match(shell,/readStudentPreferences\(window\.localStorage,studentId\)/);
   assert.match(shell,/writeStudentPreferences\(window\.localStorage,studentId,clean\)/);
   assert.doesNotMatch(overview,/localStorage\.setItem\([^)]*(cgpa|grades|password|csrf|courses)/i);
@@ -63,9 +63,11 @@ test('today class list filters real ERP days and groups repeated periods',()=>{
   assert.equal(monday.length,1);
   assert.equal(monday[0].periodCount,2);
 });
-test('active semester is selected explicitly, and upstream reads remain authenticated',()=>{
-  assert.match(overview,/Select year/);
-  assert.match(overview,/Select semester/);
+test('active semester is shown read-only and upstream reads remain authenticated',()=>{
+  assert.match(overview,/\{year\|\|'Not configured'\}/);
+  assert.match(overview,/\{semester\|\|'Not configured'\}/);
+  assert.match(overview,/at-home-session-value/);
+  assert.doesNotMatch(overview,/<select|onYearChange|onSemesterChange/);
   assert.match(overview,/!canSync\|\|overviewBusy/);
   assert.match(overview,/await onRefreshAttendance\(\)/);
   assert.match(overview,/credentials:'same-origin',cache:'no-store'/);
@@ -76,7 +78,7 @@ test('overview is responsive with accessible controls and privacy labels',()=>{
   assert.match(css,/@media\(max-width:1150px\)/);
   assert.match(css,/@media\(max-width:650px\)/);
   assert.match(css,/\.at-home-stat-grid\{grid-template-columns:1fr;gap:11px\}/);
-  assert.match(overview,/aria-label="Current semester selection"/);
+  assert.match(overview,/aria-label="Current academic session"/);
   assert.match(overview,/aria-pressed=\{cgpaVisible\}/);
-  assert.match(overview,/Nickname is optional and saved only on this browser/);
+  assert.match(overview,/Your saved semester from Settings/);
 });
