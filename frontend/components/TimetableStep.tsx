@@ -11,7 +11,7 @@ type ClassSlot={
 };
 type Timetable={
   source:'erp';academicYear:string;semester:string;
-  days:string[];periods:number[];classes:ClassSlot[];
+  days:string[];periods:number[];classes:ClassSlot[];periodsInferred:boolean;
 };
 function isTerms(raw:unknown):raw is Terms {
   if(!raw||typeof raw!=='object')return false;
@@ -28,9 +28,10 @@ function isTimetable(raw:unknown):raw is Timetable {
     typeof value.semester==='string'&&Array.isArray(value.days)&&
     value.days.length>0&&value.days.length<=7&&
     value.days.every(d=>typeof d==='string'&&/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/.test(d))&&
-    Array.isArray(value.periods)&&value.periods.length>=3&&value.periods.length<=16&&
-    value.periods.every(p=>Number.isSafeInteger(p)&&p>=1&&p<=16)&&
-    Array.isArray(value.classes)&&value.classes.length<=160&&
+    Array.isArray(value.periods)&&value.periods.length>=3&&value.periods.length<=32&&
+    value.periods.every(p=>Number.isSafeInteger(p)&&p>=1&&p<=32)&&
+    typeof value.periodsInferred==='boolean'&&
+    Array.isArray(value.classes)&&value.classes.length<=220&&
     value.classes.every(s=>s&&typeof s.day==='string'&&value.days!.includes(s.day)&&
       value.periods!.includes(s.period)&&typeof s.raw==='string'&&s.raw.length<=280);
 }
@@ -134,7 +135,7 @@ export default function TimetableStep(){
       <div className="at-time-grid-heading">
         <div><h2>Weekly timetable</h2>
           <p>{timetable.academicYear} · {timetable.semester} · {timetable.days.length} teaching days</p></div>
-        <span><Clock3 size={15}/> Period numbers from ERP</span>
+        <span><Clock3 size={15}/> {timetable.periodsInferred?'Period positions from ERP grid':'Period numbers from ERP'}</span>
       </div>
       <section className="at-panel at-time-grid-panel">
         <div className="at-time-grid-scroll">
@@ -160,8 +161,9 @@ export default function TimetableStep(){
         </div>
       </section>
       <p className="at-time-note"><ShieldCheck size={16}/>
-        Times are intentionally omitted because this ERP response provides period numbers,
-        not verified start and end times. Confirm daily timing with your university schedule.</p>
+        Periods are aligned to the timetable columns received from ERP. When a header is
+        absent, positions are inferred from column order, not verified period labels.
+        Start and end times are not supplied; confirm timings with the university.</p>
     </>}
     {!timetable&&loading==='idle'&&!error&&
       <div className="at-time-empty"><CalendarDays size={30}/>
