@@ -2,6 +2,7 @@ import 'server-only';
 import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { cookies, headers } from 'next/headers';
 import { load } from 'cheerio';
+import { usesPjaxLogin } from './erp_pjax';
 
 const ROOT = 'https://newerp.kluniversity.in';
 const NAME = 'attendly_private_erp';
@@ -80,7 +81,7 @@ export async function upstream(path: string, state: ERPState | {upstream: Record
         'X-Requested-With':'XMLHttpRequest',
         // Official NewERP login is handled by Yii/PJAX. Use PJAX only
         // for the login submission; attendance requests remain unchanged.
-        ...(url(path).includes('r=site%2Flogin') ? {'X-PJAX':'true'} : {}),
+        ...(usesPjaxLogin(method,url(path)) ? {'X-PJAX':'true'} : {}),
         'Origin':ROOT,
         'Referer':ROOT+'/',
         'Accept':'text/html, */*; q=0.01',
