@@ -2,15 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Activity, ArrowRight, ArrowUpRight, BookOpen, CalendarDays,
-  ChartNoAxesCombined, Check, ChevronRight, CircleHelp, Clock3,
-  GraduationCap, LayoutDashboard, LogOut, RefreshCw, Search,
-  ShieldCheck, SlidersHorizontal, Target, TrendingUp,
+  ArrowRight, BookOpen, CalendarDays, ChartNoAxesCombined, ChevronRight,
+  CircleHelp, Clock3, GraduationCap, LogOut, RefreshCw, ShieldCheck,
+  Target,
 } from 'lucide-react';
-import {
-  fmt, totals, PARTS, WEIGHTS, projection,
-  type Course, type Part,
-} from '../lib/calculator';
+import { fmt, totals, PARTS, type Course } from '../lib/calculator';
 import { readERP, writeERP } from '../lib/erp_cache';
 
 type Terms = {years: string[]; semesters: string[]};
@@ -28,12 +24,7 @@ type DisplayData = {
   savedAt: string;
   cached: boolean;
 };
-type Section = 'overview' | 'subjects' | 'planner';
 type Loading = 'idle' | 'terms' | 'attendance';
-
-const partNames: Record<Part,string> = {
-  L: 'Lecture', T: 'Tutorial', P: 'Practical', S: 'Skill',
-};
 
 async function api<T>(path:string, init?:RequestInit):Promise<T> {
   const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...init});
@@ -74,9 +65,6 @@ function validateAttendance(raw:AttendanceResult,id:string,year:string,sem:strin
   }
   return raw.courses;
 }
-function numer(n:number) {
-  return Number.isInteger(n)?String(n):n.toFixed(2);
-}
 function grade(p:number|null,target:number) {
   if(p===null)return 'neutral';
   if(p>=target)return 'success';
@@ -106,7 +94,6 @@ export default function AttendanceStep({
   loggingOut:boolean;
   logoutError?:string;
 }) {
-  const [section,setSection]=useState<Section>('overview');
   const [terms,setTerms]=useState<Terms|null>(null);
   const [year,setYear]=useState('');
   const [semester,setSemester]=useState('');
@@ -114,8 +101,6 @@ export default function AttendanceStep({
   const [error,setError]=useState('');
   const [display,setDisplay]=useState<DisplayData|null>(null);
   const [target,setTarget]=useState(75);
-  const [futurePart,setFuturePart]=useState<Part>('L');
-  const [query,setQuery]=useState('');
 
   useEffect(()=>{
     let active=true;
@@ -129,25 +114,11 @@ export default function AttendanceStep({
 
   const busy=loading!=='idle';
   const summary=useMemo(()=>{
-    const courses=display?.courses||[];
-    const rows=courses.map(totals);
-    const attended=rows.reduce((s,v)=>s+v.a,0);
-    const conducted=rows.reduce((s,v)=>s+v.t,0);
-    const percent=conducted?attended/conducted*100:null;
-    const atRisk=courses.filter(course=>{
-      const p=totals(course).percentage;
-      return p!==null&&p<target;
-    }).length;
-    return {attended,conducted,percent,atRisk,total:courses.length};
-  },[display,target]);
-  const plan=useMemo(()=>projection(summary.attended,summary.conducted,target,futurePart),
-    [summary.attended,summary.conducted,target,futurePart]);
-  const filtered=useMemo(()=>{
-    const courses=display?.courses||[];
-    const term=query.trim().toLowerCase();
-    return term?courses.filter(c=>
-      c.name.toLowerCase().includes(term)||c.code.toLowerCase().includes(term)):courses;
-  },[display,query]);
+    const rows=(display?.courses||[]).map(totals);
+    const attended=rows.reduce((sum,row)=>sum+row.a,0);
+    const conducted=rows.reduce((sum,row)=>sum+row.t,0);
+    return {percent:conducted?100*attended/conducted:null};
+  },[display]);
 
   async function loadTerms(){
     setLoading('terms');setError('');
@@ -183,14 +154,13 @@ export default function AttendanceStep({
       setDisplay({academicYear:year,semester,courses,savedAt,cached:false});
       try {await writeERP({studentId,academicYear:year,semester,courses,savedAt});}
       catch {/* IndexedDB can be unavailable in a private window. */}
-      setSection('overview');
     } catch(e) {
       setError(e instanceof Error?e.message:'Attendance could not be loaded.');
     } finally{setLoading('idle');}
   }
 
-  function SubjectList({limit}:{limit?:number}) {
-    const courses=limit?filtered.slice(0,limit):filtered;
+  function SubjectList() {
+    const courses=display?.courses||[];
     return <div className="at-course-list">
       {courses.map(course=>{
         const t=totals(course);
@@ -212,69 +182,23 @@ export default function AttendanceStep({
     </div>;
   }
 
-  function Metrics(){
-    return <div className="at-metrics">
-      <section className="at-metric at-metric-primary">
-        <div className="at-metric-top"><span>Overall attendance</span><Activity size={19}/></div>
-        <strong className="at-metric-value">{fmt(summary.percent)}</strong>
-        <div className="at-metric-bottom"><span className={'at-status-pill '+grade(summary.percent,target)}>
-          {summary.percent===null?'No data':summary.percent>=target?'On track':'Below target'}</span>
-          <span>LTPS weighted</span>
-        </div>
-        <div className="at-metric-bg" aria-hidden="true"/>
-      </section>
-      <section className="at-metric">
-        <div className="at-metric-top"><span>Subjects tracked</span><BookOpen size={19}/></div>
-        <strong className="at-metric-value">{summary.total.toString().padStart(2,'0')}</strong>
-        <p>{summary.atRisk} below your {target}% goal</p>
-      </section>
-      <section className="at-metric">
-        <div className="at-metric-top"><span>Weighted attended</span><Check size={19}/></div>
-        <strong className="at-metric-value">{numer(summary.attended)}</strong>
-        <p>Out of {numer(summary.conducted)} conducted</p>
-      </section>
-      <section className="at-metric">
-        <div className="at-metric-top"><span>Goal</span><Target size={19}/></div>
-        <strong className="at-metric-value">{target}%</strong>
-        <p>Personal attendance target</p>
-      </section>
-    </div>;
-  }
-
-  const nav:{key:Section;label:string;icon:typeof Activity}[]=[
-    {key:'overview',label:'Overview',icon:LayoutDashboard},
-    {key:'subjects',label:'My subjects',icon:BookOpen},
-    {key:'planner',label:'Attendance planner',icon:ChartNoAxesCombined},
-  ];
   const dateLabel=display ? new Date(display.savedAt).toLocaleString() : 'Not synced yet';
 
   return <div className="at-app">
     <aside className="at-sidebar">
       <div className="at-sidebar-brand"><Logo/><small>STUDENT WORKSPACE</small></div>
-      <p className="at-side-caption">WORKSPACE</p>
       <nav className="at-side-nav" aria-label="Main navigation">
-        {nav.map(item=><button key={item.key} type="button"
-          className={'at-nav-item '+(section===item.key?'active':'')}
-          onClick={()=>setSection(item.key)}>
-          <item.icon size={19}/><span>{item.label}</span>
-          {section===item.key&&<span className="at-nav-active-dot"/>}
-        </button>)}
+        <div className="at-nav-item active" aria-current="page">
+          <BookOpen size={19}/><span>Attendance</span>
+          <span className="at-nav-active-dot"/>
+        </div>
       </nav>
-      <div className="at-sidebar-spacer"/>
-      <section className="at-sidebar-tip">
-        <div className="at-tip-icon"><TrendingUp size={19}/></div>
-        <strong>Stay in the know.</strong>
-        <p>See where each subject stands and plan with confidence.</p>
-      </section>
-      <div className="at-side-connected"><span className="at-online-dot"/><span>
-        <strong>ERP connected</strong><small>Authenticated session</small></span></div>
-      <p className="at-side-legal">Independent student-built tool.<br/>Not affiliated with KL University.</p>
     </aside>
 
     <div className="at-app-main">
       <header className="at-app-topbar">
         <div className="at-breadcrumb"><span>Workspace</span><ChevronRight size={14}/>
-          <strong>{nav.find(item=>item.key===section)?.label}</strong></div>
+          <strong>Attendance</strong></div>
         <div className="at-top-actions">
           <span className="at-top-connected"><span className="at-online-dot"/> Connected to ERP</span>
           <div className="at-profile"><span className="at-profile-avatar"><GraduationCap size={17}/></span>
@@ -289,11 +213,8 @@ export default function AttendanceStep({
         <div className="at-page-intro">
           <div>
             <div className="at-section-label"><span className="at-label-dot"/> PERSONAL ATTENDANCE HUB</div>
-            <h1>{section==='overview'?'Your attendance, at a glance.':
-                 section==='subjects'?'Every subject, in detail.':'Plan your next move.'}</h1>
-            <p>{section==='overview'?'Your academic progress, organized in one clear view.':
-                section==='subjects'?'Track every lecture, tutorial, practical and skill component.':
-                'Estimate how upcoming classes could affect your attendance.'}</p>
+            <h1>Your attendance, at a glance.</h1>
+            <p>Your academic progress, organized in one clear view.</p>
           </div>
           <span className="at-session-badge"><ShieldCheck size={16}/> Secure ERP session</span>
         </div>
@@ -351,15 +272,11 @@ export default function AttendanceStep({
           {display.cached&&<div className="at-cache-notice"><CircleHelp size={17}/>
             You're viewing a saved copy. Use Sync attendance to get the latest ERP records.</div>}
 
-          {section==='overview'&&<>
-            <Metrics/>
-            <div className="at-overview-grid">
+          <div className="at-overview-grid">
               <section className="at-panel at-overview-subjects">
                 <div className="at-panel-head"><div><h2>Subject attendance</h2>
-                  <p>A quick look at all your courses</p></div>
-                  <button className="at-inline-button" type="button"
-                    onClick={()=>setSection('subjects')}>View all <ArrowUpRight size={16}/></button></div>
-                <SubjectList limit={6}/>
+                  <p>All your courses in one place</p></div></div>
+                <SubjectList/>
               </section>
               <div className="at-overview-right">
                 <section className="at-panel at-goal-panel">
@@ -379,82 +296,7 @@ export default function AttendanceStep({
                 </section>
               </div>
             </div>
-          </>}
 
-          {section==='subjects'&&<section className="at-panel at-subjects-panel">
-            <div className="at-panel-head at-subjects-panel-head">
-              <div><h2>All subjects <span className="at-subject-count">{summary.total}</span></h2>
-                <p>Weighted percentage and detailed LTPS breakdown</p></div>
-              <div className="at-search"><Search size={17}/>
-                <input value={query} onChange={e=>setQuery(e.target.value)}
-                  aria-label="Search subjects" placeholder="Search subjects…"/></div>
-            </div>
-            <div className="at-subject-detail-list">
-              {filtered.map(course=>{
-                const data=totals(course);
-                const tone=grade(data.percentage,target);
-                return <article className="at-subject-detail" key={course.code}>
-                  <div className="at-subject-detail-head">
-                    <div className="at-course-avatar">{course.name.charAt(0)}</div>
-                    <div><strong>{course.name}</strong><small>{course.code}</small></div>
-                    <div className="at-detail-score"><strong className={'at-text-'+tone}>{fmt(data.percentage)}</strong>
-                      <span>Weighted attendance</span></div>
-                  </div>
-                  <Progress percent={data.percentage} tone={tone}/>
-                  <div className="at-component-grid">
-                    {PARTS.filter(p=>course.components[p]).map(part=>{
-                      const c=course.components[part]!;
-                      return <div key={part}>
-                        <span className="at-part-mark">{part}</span>
-                        <div><strong>{partNames[part]}</strong><small>{c.attended}/{c.conducted} classes · {WEIGHTS[part]*100}% weight</small></div>
-                        <strong>{fmt(c.conducted?100*c.attended/c.conducted:null)}</strong>
-                      </div>;
-                    })}
-                  </div>
-                </article>;
-              })}
-              {!filtered.length&&<p className="at-small-empty">No matching subjects found.</p>}
-            </div>
-          </section>}
-
-          {section==='planner'&&<div className="at-planner-grid">
-            <section className="at-panel">
-              <div className="at-panel-head"><div><h2>Build a scenario</h2>
-                <p>Choose your personal attendance target</p></div><SlidersHorizontal size={20}/></div>
-              <label className="at-field-label" htmlFor="at-goal-number">Attendance target</label>
-              <div className="at-number-field"><input id="at-goal-number" type="number" min="1" max="99"
-                value={target} onChange={e=>setTarget(Math.min(99,Math.max(1,Number(e.target.value)||1)))}/><span>%</span></div>
-              <label className="at-field-label" htmlFor="at-future-part">Future class type</label>
-              <select id="at-future-part" className="at-planner-select" value={futurePart}
-                onChange={e=>setFuturePart(e.target.value as Part)}>
-                {PARTS.map(p=><option key={p} value={p}>{partNames[p]} ({p}) · {WEIGHTS[p]*100}% weight</option>)}
-              </select>
-              <div className="at-planner-note"><CircleHelp size={18}/>
-                These estimates assume upcoming classes all have the chosen LTPS type.
-                Actual timetables and university eligibility rules may differ.</div>
-            </section>
-            <section className="at-panel">
-              <div className="at-panel-head"><div><h2>Your attendance forecast</h2>
-                <p>Based on {fmt(summary.percent)} current attendance</p></div><TrendingUp size={20}/></div>
-              <div className="at-forecast-tiles">
-                <div><span>ATTEND TO REACH TARGET</span><strong>{plan.mustAttend??'—'}</strong>
-                  <small>future {futurePart} classes attended</small></div>
-                <div><span>CAN MISS AT TARGET</span><strong>{plan.canMiss}</strong>
-                  <small>future {futurePart} classes missed</small></div>
-              </div>
-              <div className="at-forecast-title">SUBJECT-WISE FORECAST</div>
-              <div className="at-forecast-list">
-                {display.courses.map(course=>{
-                  const t=totals(course);
-                  const p=projection(t.a,t.t,target,futurePart);
-                  return <div key={course.code}>
-                    <div><strong>{course.name}</strong><small>{fmt(t.percentage)}</small></div>
-                    <span>{p.mustAttend??'—'} attend · {p.canMiss} miss</span>
-                  </div>;
-                })}
-              </div>
-            </section>
-          </div>}
         </>}
 
         <footer className="at-dashboard-footer">
