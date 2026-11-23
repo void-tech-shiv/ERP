@@ -698,3 +698,53 @@ h1,h2,h3,h4 {font-family:Manrope,system-ui,sans-serif}
   .at-home-class-room{grid-column:2}
   .at-home-today-heading>button{font-size:10px}
 }
+
+
+/* Student Settings — secure local preferences, consistent with Attendly dashboard. */
+.at-settings{display:flex;flex-direction:column;gap:21px;max-width:1120px;margin:0 auto}
+.at-settings-intro{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+.at-settings-intro h1{font-size:30px;color:#1c2944;letter-spacing:-1.1px;margin:9px 0 7px}
+.at-settings-intro p{font-size:12px;color:#8995aa;line-height:1.7}
+.at-settings-form{display:flex;flex-direction:column;gap:17px}
+.at-settings-panel{padding:26px 28px;border:1px solid #e9eaf5;border-radius:18px;background:white;box-shadow:0 12px 30px #30396609}
+.at-settings-panel-head{display:flex;align-items:center;gap:13px;margin-bottom:23px}
+.at-settings-panel-head h2{font-size:16px;letter-spacing:-.3px;color:#223052}
+.at-settings-panel-head p{font-size:11px;color:#8f9aad;line-height:1.6;margin-top:5px}
+.at-settings-icon{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;color:#6957d9;background:#edeaff;flex:none}
+.at-settings-label{font-size:11px;font-weight:800;color:#586882;display:flex;flex-direction:column;gap:9px}
+.at-settings-panel input,.at-settings-panel select{display:block;border:1px solid #dee4f1;border-radius:10px;background:#fff;color:#243251;padding:12px 14px;min-height:45px;outline:none;font-size:12px;font-weight:700;width:100%;max-width:420px}
+.at-settings-panel input:focus,.at-settings-panel select:focus{border-color:#7467df;box-shadow:0 0 0 3px #6555ed1c}
+.at-settings-panel small{display:block;color:#8796ad;font-size:10px;line-height:1.75;margin-top:10px}
+.at-settings-term-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;max-width:750px}
+.at-settings-term-fields select{max-width:none}
+.at-settings-privacy-row{border:1px solid #e9e7f4;background:#fafbfe;border-radius:14px;padding:18px;display:flex;align-items:center;justify-content:space-between;gap:18px}
+.at-settings-privacy-description{display:flex;align-items:center;gap:13px}
+.at-settings-privacy-description>svg{color:#7465e1;flex:none}
+.at-settings-privacy-description strong{display:block;font-size:12px;color:#2d3955}
+.at-settings-privacy-description small{margin-top:6px}
+.at-settings-toggle{flex:none;display:flex;align-items:center;width:49px;height:28px;padding:4px;border:0;border-radius:999px;background:#d2d8e4;cursor:pointer;transition:background .2s}
+.at-settings-toggle.enabled{background:#6b5bed}
+.at-settings-toggle>span{width:20px;height:20px;background:#fff;border-radius:50%;box-shadow:0 1px 3px #0002;transition:transform .2s}
+.at-settings-toggle.enabled>span{transform:translateX(21px)}
+.at-settings-toggle:focus-visible{outline:3px solid #8a7df799;outline-offset:3px}
+.at-settings-privacy-tip{display:flex;align-items:flex-start;gap:9px;border-radius:12px;margin-top:15px;color:#587868;background:#f0f9f4;padding:12px 14px;font-size:11px;line-height:1.7}
+.at-settings-privacy-tip svg{flex:none;color:#29a27e}
+.at-settings-success{display:flex;align-items:center;gap:9px;color:#178b6b;background:#e8f8ee;border:1px solid #d3ecdf;font-size:12px;font-weight:800;border-radius:12px;padding:13px 16px}
+.at-settings-actions{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:15px}
+.at-settings-actions p{font-size:11px;color:#8895aa}
+.at-settings-actions button{white-space:nowrap}
+.at-settings-foot{display:flex;gap:9px;align-items:flex-start;color:#8997ad;font-size:11px;line-height:1.7}
+.at-settings-foot svg{flex:none}
+@media(max-width:720px){
+  .at-settings-intro{flex-direction:column}
+  .at-settings-intro h1{font-size:25px}
+  .at-settings-panel{padding:21px 18px}
+  .at-settings-term-fields{grid-template-columns:1fr}
+  .at-settings-panel input{max-width:none}
+}
+@media(max-width:420px){
+  .at-settings-privacy-row{padding:12px}
+  .at-settings-privacy-description{gap:8px}
+  .at-settings-actions{align-items:stretch;flex-direction:column}
+  .at-settings-actions .at-btn{width:100%;justify-content:center}
+}
