@@ -622,6 +622,9 @@ h1,h2,h3,h4 {font-family:Manrope,system-ui,sans-serif}
 .at-home-sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;border:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 .at-home-session{border-radius:19px!important;border:1px solid #e9ebf6;background:#fff}
 .at-home-session-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.at-home-session-actions{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.at-home-edit-settings{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:#6555d6;font-size:11px;font-weight:800;cursor:pointer;padding:8px}
+.at-home-edit-settings:focus-visible{outline:2px solid #6555d6;outline-offset:2px;border-radius:8px}
 .at-home-session-heading h2{font-size:17px;margin:8px 0 6px;letter-spacing:-.4px}
 .at-home-session-heading p{color:#909bb1;font-size:11px;line-height:1.6}
 .at-home-authenticated{color:#2d9d7a;background:#eafaf3;border:1px solid #d2f2e1;display:inline-flex;align-items:center;gap:7px;padding:9px 12px;border-radius:99px;white-space:nowrap;font-size:10px;font-weight:800}
@@ -683,6 +686,8 @@ h1,h2,h3,h4 {font-family:Manrope,system-ui,sans-serif}
   .at-home-session-fields .at-btn{grid-column:1/-1}
 }
 @media(max-width:650px){
+  .at-home-session-actions{flex-direction:row;align-items:center}
+  .at-home-session-heading{flex-wrap:wrap}
   .at-home-overview{gap:14px}
   .at-home-hero{padding:26px 22px;border-radius:18px}
   .at-home-hero h1{font-size:30px;letter-spacing:-.8px}
