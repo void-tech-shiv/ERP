@@ -60,7 +60,7 @@ function parseCell(raw:string,day:string,period:number):TimetableClass {
  */
 export type TimetableFailure=
   'TT_FORBIDDEN_HTML'|'TT_LOGIN_REQUIRED'|'TT_SEARCH_FORM'|
-  'TT_EMPTY_RESULT'|'TT_UNRECOGNIZED_TABLE'|'TT_UNEXPECTED_RESPONSE';
+  'TT_EMPTY_RESULT'|'TT_UNRECOGNIZED_TABLE'|'TT_TIMETABLE_HEADER_CHANGED'|'TT_UNEXPECTED_RESPONSE';
 
 export function classifyTimetableFailure(html:string):TimetableFailure {
   const $=load(html);
@@ -77,6 +77,10 @@ export function classifyTimetableFailure(html:string):TimetableFailure {
     return 'TT_SEARCH_FORM';
   if(/no results found|no records found|no timetable found/i.test(visible))
     return 'TT_EMPTY_RESULT';
+  // Only treat a table as timetable-related when ERP actually labels the
+  // result that way. Other tables can be part of its dashboard navigation.
+  if(/academic timetable|student timetable/i.test(visible)&&$('table').length)
+    return 'TT_TIMETABLE_HEADER_CHANGED';
   if($('table').length)
     return 'TT_UNRECOGNIZED_TABLE';
   return 'TT_UNEXPECTED_RESPONSE';
@@ -92,22 +96,35 @@ export function parseTimetable(html:string):Timetable {
   if($('.site-error').text().match(/forbidden|not allowed to perform/i))
     throw new Error('ERP denied timetable access');
   let result:Timetable|null=null;
+  // Real Yii GridView pages may contain navigation tables and additional
+  // header rows. Find an actual Day + numbered-period header, not blindly
+  // the first <tr> of the first table.
   $('table').each((_,table)=>{
     const rows=$(table).find('tr').toArray();
     if(rows.length<2)return;
-    const first=$(rows[0]).children('th,td').toArray().map(c=>tidy($(c).text()));
-    if(!/^(?:0\s*)?day$/i.test(first[0]||''))return;
-    const periods=first.slice(1).map(Number);
+    const headerIndex=rows.findIndex(row=>{
+      const label=tidy($(row).children('th,td').first().text()).replace(/\s+/g,'');
+      return /^(?:(?:0|#))?day$/i.test(label);
+    });
+    if(headerIndex<0)return;
+    const header=$(rows[headerIndex]).children('th,td').toArray();
+    const periodCells=header.slice(1).map(cell=>tidy($(cell).text()));
+    const periods=periodCells.map(label=>{
+      const match=label.match(/^(?:s|period)?\s*(\d{1,2})$/i);
+      return match?Number(match[1]):NaN;
+    });
     if(periods.length<3||periods.length>16||
-       periods.some((p,i)=>!Number.isInteger(p)||p<1||p>16||(i>0&&p<=periods[i-1])))return;
+       periods.some((p,i)=>!Number.isInteger(p)||p<1||p>16||
+         (i>0&&p<=periods[i-1])))return;
+
     const days:string[]=[];
     const classes:TimetableClass[]=[];
-    for(const row of rows.slice(1)){
+    for(const row of rows.slice(headerIndex+1)){
       const cells=$(row).children('td,th').toArray();
       if(!cells.length)continue;
-      const label=tidy($(cells[0]).text()).toLowerCase();
+      const label=tidy($(cells[0]).text()).toLowerCase().replace(/\.$/,'');
       const day=DAY_LABELS[label];
-      if(!day)continue; // Ignore footer/summary rows, not a scheduled day.
+      if(!day)continue; // Ignore Yii summary/footer rows.
       if(days.includes(day)||cells.length!==periods.length+1)
         throw new Error('ERP timetable day row changed');
       days.push(day);
