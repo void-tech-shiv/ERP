@@ -24,8 +24,6 @@ export default function SettingsStep({preferences,terms,busy,onSave}:Props){
 
   useEffect(()=>{
     setDraft(preferences);
-    setMessage('');
-    setError('');
   },[preferences]);
 
   function submit(event:FormEvent<HTMLFormElement>){
