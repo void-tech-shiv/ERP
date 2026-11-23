@@ -467,3 +467,40 @@ h1,h2,h3,h4 {font-family:Manrope,system-ui,sans-serif}
   .at-seating-stats>div>small{font-size:9px}
   .at-seating-panel-head{gap:13px}
 }
+
+
+/* ERP Timetable: readable weekly grid, with horizontal scrolling on small screens. */
+.at-time-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:0 0 24px}
+.at-time-heading h1{font-size:30px;letter-spacing:-1.1px;margin:10px 0 6px}
+.at-time-heading p{font-size:12px;color:var(--muted);line-height:1.7}
+.at-time-session{margin-bottom:24px}
+.at-time-grid-heading{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:16px}
+.at-time-grid-heading h2{font-size:18px}
+.at-time-grid-heading p{font-size:11px;color:var(--muted);margin-top:6px}
+.at-time-grid-heading>span{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:11px}
+.at-time-grid-panel{padding:0!important;overflow:hidden}
+.at-time-grid-scroll{width:100%;overflow:auto;overscroll-behavior-x:contain}
+.at-time-grid{border-collapse:separate;border-spacing:0;width:100%;min-width:max-content;table-layout:fixed}
+.at-time-grid thead th{background:#f4f6fc;color:#59657b;border-right:1px solid #e6eaf3;border-bottom:1px solid #e6eaf3;text-align:center;font-size:11px;font-weight:800;padding:16px 10px;min-width:135px}
+.at-time-grid thead .at-time-sticky{min-width:85px}
+.at-time-grid tbody th,.at-time-grid tbody td{border-right:1px solid #ecedf6;border-bottom:1px solid #ecedf6;height:105px;padding:9px;vertical-align:top}
+.at-time-grid tbody th{background:#fafbff;color:#26334c;font-size:12px;font-weight:800;text-align:center;padding:31px 12px}
+.at-time-grid tbody tr:nth-child(even) td{background:#fcfdff}
+.at-time-grid .at-time-sticky{position:sticky;left:0;z-index:2}
+.at-time-grid thead .at-time-sticky{z-index:3}
+.at-time-grid tbody tr:last-child>*{border-bottom:0}
+.at-time-grid thead th:last-child,.at-time-grid tbody tr>*:last-child{border-right:0}
+.at-time-class{height:100%;min-height:84px;min-width:126px;border:1px solid #cbd9ff;border-radius:11px;background:#eaf1ff;padding:11px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;color:#3558b9}
+.at-time-class strong{font-size:11px;line-height:1.4;overflow-wrap:anywhere}
+.at-time-class small{font-size:10px;color:#4671c7;line-height:1.45}
+.at-time-component{font-size:9px;font-weight:900;color:#5951d3;background:#fff;padding:3px 6px;border-radius:5px}
+.at-time-room{display:flex;gap:5px;align-items:center;margin-top:auto;font-size:10px;font-weight:800}
+.at-time-room svg{flex:none}
+.at-time-note{display:flex;align-items:flex-start;gap:9px;margin:16px 0;color:#8995a8;font-size:11px;line-height:1.7}
+.at-time-note svg{flex:none;color:#7569df}
+.at-time-loading{display:flex;gap:12px;align-items:center;color:#7b86a0;font-size:12px}
+.at-time-empty{display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:12px;min-height:250px;border:1px dashed #d9def0;border-radius:16px;background:#fff;color:#737f98;padding:25px}
+.at-time-empty svg{color:#6b5bec}
+.at-time-empty strong{font-size:14px;color:var(--ink)}
+.at-time-empty p{font-size:12px;color:var(--muted)}
+@media(max-width:750px){.at-time-heading{flex-direction:column}.at-time-heading h1{font-size:26px}.at-time-grid-heading{align-items:flex-start;flex-direction:column}.at-time-grid thead th{min-width:125px}.at-time-class{min-width:116px}}
