@@ -53,6 +53,10 @@ export function parseSeatingPage(html:string,studentId:string,expectedPage=1):Se
   const col=(key:string)=>labels.indexOf(key);
   const summary=norm(grid.find('.summary').first().text());
   const range=summary.match(/showing\s+(\d+)\s*[-–]\s*(\d+)\s+of\s+(\d+)\s+items?/i);
+  // Yii GridView may render an empty-state row instead of normal pagination.
+  if(!range && /no results found/i.test(norm(grid.text())) &&
+     !table.find('tbody tr td').filter((_,td)=>!$(td).attr('colspan')).length)
+    return {records:[],first:0,last:0,total:0,nextPage:null};
   if(!range)throw new Error('ERP seating pagination summary changed');
   const first=Number(range[1]),last=Number(range[2]),total=Number(range[3]);
   if(total<1||total>LIMIT||first<1||last<first||last>total||
