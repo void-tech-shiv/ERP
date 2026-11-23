@@ -133,50 +133,74 @@ export function parseTimetable(html:string):Timetable {
   if($('.site-error').text().match(/forbidden|not allowed to perform/i))
     throw new Error('ERP denied timetable access');
   let result:Timetable|null=null;
-  // Real Yii GridView pages may contain navigation tables and additional
-  // header rows. Find an actual Day + numbered-period header, not blindly
-  // the first <tr> of the first table.
+  // The real ERP grid can contain 25 cells per day (day + 24 slots) and
+  // sometimes omits the header from the returned HTML. Verify day labels,
+  // consistent width and actual course entries before inferring column slots.
   $('table').each((_,table)=>{
-    const rows=$(table).find('tr').toArray();
+    const rows=$(table).find('tr').toArray().filter(row=>
+      $(row).closest('table')[0]===table
+    );
     if(rows.length<2)return;
-    const headerIndex=rows.findIndex(row=>{
-      const label=tidy($(row).children('th,td').first().text()).replace(/\s+/g,'');
-      return /^(?:(?:0|#))?day$/i.test(label);
-    });
-    if(headerIndex<0)return;
-    const header=$(rows[headerIndex]).children('th,td').toArray();
-    const periodCells=header.slice(1).map(cell=>tidy($(cell).text()));
-    const periods=periodCells.map(label=>{
-      const match=label.match(/^(?:s|period)?\s*(\d{1,2})$/i);
-      return match?Number(match[1]):NaN;
-    });
-    if(periods.length<3||periods.length>16||
-       periods.some((p,i)=>!Number.isInteger(p)||p<1||p>16||
-         (i>0&&p<=periods[i-1])))return;
+    const cellRows=rows.map(row=>$(row).children('th,td').toArray());
+    const actualDays=cellRows.map((cells,index)=>{
+      const label=tidy(cells.length?$(cells[0]).text():'').toLowerCase().replace(/\.$/,'');
+      return {cells,index,day:DAY_LABELS[label]||null};
+    }).filter((item):item is {cells:typeof cellRows[number];index:number;day:string}=>item.day!==null);
+    if(actualDays.length<2||actualDays.length>7)return;
+    const width=actualDays[0].cells.length;
+    if(width<4||width>33||actualDays.some(x=>x.cells.length!==width)||
+      new Set(actualDays.map(x=>x.day)).size!==actualDays.length)
+      throw new Error('ERP timetable day row changed');
+    const slots=width-1;
+
+    const headerCandidate=cellRows
+      .slice(0,actualDays[0].index)
+      .filter(cells=>cells.length===width)
+      .map(cells=>{
+        const labels=cells.map(cell=>tidy($(cell).text()));
+        const first=labels[0].replace(/\s+/g,'').toLowerCase();
+        const numbered=labels.slice(1).map(label=>{
+          const match=label.match(/^(?:s|period)?\s*(\d{1,2})$/i);
+          return match?Number(match[1]):null;
+        });
+        const recognized=numbered.filter((x):x is number=>x!==null).length;
+        return {first,numbered,recognized};
+      })
+      .find(header=>/^(?:0|#)?day$/.test(header.first)||
+        header.recognized>=Math.ceil(slots*0.75));
+    let periods:number[];
+    if(headerCandidate){
+      const candidate=headerCandidate.numbered;
+      if(candidate.some(v=>v===null)||
+         candidate.some((v,i)=>v!==(i?candidate[i-1]!+1:1)))
+        return; // Header exists but is malformed; never guess over it.
+      periods=candidate as number[];
+    }else{
+      // Header genuinely missing: accept positional 1..N only when the
+      // authenticated page has a recognizable multi-day LTPS grid. This
+      // preserves the period-to-cell alignment without hardcoding classes.
+      const plausible=actualDays.some(item=>item.cells.slice(1).some(cell=>{
+        const raw=tidy($(cell).text());
+        return /^[A-Z0-9]{5,28}\s*[-–]\s*[LTPS](?=\s*[-–]|\s|$)/i.test(raw);
+      }));
+      if(!plausible)return;
+      periods=Array.from({length:slots},(_,index)=>index+1);
+    }
 
     const days:string[]=[];
     const classes:TimetableClass[]=[];
-    for(const row of rows.slice(headerIndex+1)){
-      const cells=$(row).children('td,th').toArray();
-      if(!cells.length)continue;
-      const label=tidy($(cells[0]).text()).toLowerCase().replace(/\.$/,'');
-      const day=DAY_LABELS[label];
-      if(!day)continue; // Ignore Yii summary/footer rows.
-      if(days.includes(day)||cells.length!==periods.length+1)
-        throw new Error('ERP timetable day row changed');
-      days.push(day);
-      for(let i=1;i<cells.length;i++){
-        const cell=$(cells[i]);
-        // Preserve spaces around HTML <br> even when ERP omits whitespace.
+    for(const item of actualDays){
+      days.push(item.day);
+      for(let i=1;i<item.cells.length;i++){
+        const cell=$(item.cells[i]);
         const inner=(cell.html()||'').replace(/<br\s*\/?>/gi,' ');
         const raw=tidy(load('<div id="text">'+inner+'</div>')('#text').text());
         if(!raw||/^[-–]+$/.test(raw))continue;
         if(raw.length>280)throw new Error('Unexpected ERP timetable cell size');
-        classes.push(parseCell(raw,day,periods[i-1]));
-        if(classes.length>160)throw new Error('Too many ERP timetable entries');
+        classes.push(parseCell(raw,item.day,periods[i-1]));
+        if(classes.length>220)throw new Error('Too many ERP timetable entries');
       }
     }
-    if(!days.length)throw new Error('No valid ERP timetable day rows');
     result={days,periods,classes};
     return false;
   });
