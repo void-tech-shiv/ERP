@@ -10,7 +10,7 @@ export type TimetableClass={
   day:string;period:number;raw:string;courseCode:string|null;
   component:'L'|'T'|'P'|'S'|null;section:string|null;room:string|null;
 };
-export type Timetable={days:string[];periods:number[];classes:TimetableClass[]};
+export type Timetable={days:string[];periods:number[];classes:TimetableClass[];periodsInferred:boolean};
 
 const tidy=(value:string)=>value.replace(/\s+/g,' ').trim();
 const YEAR_NAME='UniversityMasterAcademicTimetableView[academicyear]';
@@ -201,7 +201,7 @@ export function parseTimetable(html:string):Timetable {
         if(classes.length>220)throw new Error('Too many ERP timetable entries');
       }
     }
-    result={days,periods,classes};
+    result={days,periods,classes,periodsInferred:!headerCandidate};
     return false;
   });
   if(!result)throw new Error('ERP timetable grid not found: '+classifyTimetableFailure(html)+' '+timetableStructureFingerprint(html));
