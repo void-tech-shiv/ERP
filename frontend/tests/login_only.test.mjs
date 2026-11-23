@@ -36,6 +36,20 @@ test('academic terms and attendance are explicitly loaded only in the authentica
   assert.match(attendance,/Select semester/);
   assert.match(attendance,/X-Attendly-CSRF/);
 });
+test('academic year and semester appear immediately and terms load after verified login', () => {
+  assert.match(attendance,/const loadTerms=useCallback\(async\(signal\?:AbortSignal\)/);
+  assert.match(attendance,/void loadTerms\(controller\.signal\)/);
+  assert.match(attendance,/\[studentId,loadTerms\]/);
+  assert.match(attendance,/terms\?\.years\.map/);
+  assert.match(attendance,/terms\?\.semesters\.map/);
+  assert.match(attendance,/Loading years/);
+  assert.match(attendance,/Loading semesters/);
+  assert.doesNotMatch(attendance,/Select academic session|at-term-first/);
+  assert.doesNotMatch(attendance,/\{!terms\s*\?/);
+  assert.match(attendance,/disabled=\{busy\|\|!terms\|\|!year\|\|!semester\}/);
+  assert.equal((attendance.match(/syncAttendance\(\)/g)||[]).length,1,
+    'attendance must sync only from the explicit button');
+});
 test('only Attendance remains in the sidebar', () => {
   const sidebar=attendance.match(/<aside className="at-sidebar">([\s\S]*?)<\/aside>/)?.[1]||'';
   assert.match(sidebar,/>Attendance<\/span>/);
