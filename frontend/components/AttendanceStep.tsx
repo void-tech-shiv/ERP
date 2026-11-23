@@ -9,6 +9,7 @@ import {
 import { fmt, totals, PARTS, type Course } from '../lib/calculator';
 import { readERP, writeERP } from '../lib/erp_cache';
 import CGPAStep from './CGPAStep';
+import ExamSeatingStep from './ExamSeatingStep';
 
 type Terms = {years: string[]; semesters: string[]};
 type AttendanceResult = {
@@ -95,7 +96,7 @@ export default function AttendanceStep({
   loggingOut:boolean;
   logoutError?:string;
 }) {
-  const [view,setView]=useState<'attendance'|'cgpa'>('attendance');
+  const [view,setView]=useState<'attendance'|'cgpa'|'seating'>('attendance');
   const [terms,setTerms]=useState<Terms|null>(null);
   const [year,setYear]=useState('');
   const [semester,setSemester]=useState('');
@@ -212,13 +213,18 @@ export default function AttendanceStep({
           <GraduationCap size={19}/><span>CGPA</span>
           {view==='cgpa'&&<span className="at-nav-active-dot"/>}
         </button>
+        <button type="button" className={'at-nav-item '+(view==='seating'?'active':'')}
+          aria-current={view==='seating'?'page':undefined} onClick={()=>setView('seating')}>
+          <CalendarDays size={19}/><span>Exam Seating</span>
+          {view==='seating'&&<span className="at-nav-active-dot"/>}
+        </button>
       </nav>
     </aside>
 
     <div className="at-app-main">
       <header className="at-app-topbar">
         <div className="at-breadcrumb"><span>Workspace</span><ChevronRight size={14}/>
-          <strong>{view==='attendance'?'Attendance':'CGPA'}</strong></div>
+          <strong>{view==='attendance'?'Attendance':view==='cgpa'?'CGPA':'Exam Seating'}</strong></div>
         <div className="at-top-actions">
           <span className="at-top-connected"><span className="at-online-dot"/> Connected to ERP</span>
           <div className="at-profile"><span className="at-profile-avatar"><GraduationCap size={17}/></span>
@@ -230,7 +236,7 @@ export default function AttendanceStep({
 
       <main className="at-workspace">
         {logoutError&&<div className="at-message at-message-error" role="alert">{logoutError}</div>}
-        {view==='cgpa' ? <CGPAStep/> : <>
+        {view==='cgpa' ? <CGPAStep/> : view==='seating' ? <ExamSeatingStep/> : <>
         <div className="at-page-intro">
           <div>
             <div className="at-section-label"><span className="at-label-dot"/> PERSONAL ATTENDANCE HUB</div>
