@@ -117,3 +117,18 @@ select{width:100%;border:1px solid #e0e4ee;background:#fff;border-radius:10px;pa
 .private-table-wrap td div{font-size:10px;color:#66758a;line-height:1.7}
 .private-foot{font-size:11px;color:#8895aa;line-height:1.8;margin:22px 0}
 @media(max-width:700px){.private-heading h1{font-size:25px}.private-card{padding:18px}.private-fields{grid-template-columns:1fr;gap:0}.private-nav{margin-bottom:26px}}
+
+/* Attendance step after verified ERP login. */
+.private-attendance-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.private-attendance-heading small{font-size:10px;font-weight:800;letter-spacing:1px;color:#7566c4}
+.private-attendance-heading h2{margin:8px 0 0}
+.private-live-pill{background:#e8f6ee;border:1px solid #c2e4ce;color:#20744c;font-size:11px;font-weight:700;border-radius:99px;padding:7px 12px}
+.private-attendance-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:10px}
+.private-attendance-actions button.secondary{background:#f0f1fb;color:#584ab1}
+.private-attendance-error{background:#fff1f0;color:#a0343b;border:1px solid #edc0be;border-radius:9px;margin:16px 0;padding:12px 14px}
+.private-attendance-results{margin-top:26px;border-top:1px solid #e6eaf2;padding-top:20px}
+.private-attendance-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.private-attendance-meta strong{font-size:14px}.private-attendance-meta span{font-size:11px;color:#808da5}
+.private-saved-note{margin-top:14px;background:#fff7e8;border-radius:9px;padding:12px;color:#856a36;font-size:12px;line-height:1.6}
+.private-component-weight{opacity:.65}
+@media(max-width:700px){.private-attendance-actions button{flex:1}.private-attendance-heading{align-items:flex-start}}
