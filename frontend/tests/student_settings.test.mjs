@@ -79,7 +79,7 @@ test('Settings is wired into sidebar and Overview via shared props',()=>{
   assert.match(shell,/onCgpaVisibilityChange=\{showCgpa=>savePreferences/);
   assert.match(timetable,/currentYear=''/);
   assert.match(timetable,/data\.years\.find\(x=>x\.label===currentYear\)/);
-  assert.match(overview,/if\(!cgpaVisible\)return;/);
+  assert.match(overview,/if\(!cgpaVisible\|\|!readyForCGPA\)return;/);
 });
 
 test('Settings requires valid paired academic term selections and deliberate save',()=>{
