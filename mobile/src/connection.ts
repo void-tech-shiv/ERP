@@ -32,11 +32,35 @@ export function resolveAttendlyUrl(raw: string | undefined, dev: boolean): Conne
   }
 }
 
-export function isAllowedNavigation(value:string, origin:string):boolean {
+/**
+ * Cloudflare Access's trusted OTP origin. Never accept arbitrary redirect
+ * hosts from web content; only the app builder's explicit Cloudflare domain.
+ */
+export function resolveCloudflareAccessOrigin(raw: string | undefined): string | null {
+  if (!raw?.trim()) return null;
+  try {
+    const url=new URL(raw.trim());
+    if (url.protocol!=='https:' || url.username || url.password ||
+        url.pathname!=='/' || url.search || url.hash || url.port ||
+        !/^[a-z0-9-]+\.cloudflareaccess\.com$/i.test(url.hostname)) return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
+export function isAllowedNavigation(
+  value:string, origin:string, accessOrigin:string|null=null,
+):boolean {
   if (value==='about:blank') return true;
   try {
     const url=new URL(value);
-    return (url.protocol==='https:' || url.protocol==='http:') && url.origin===origin;
+    return (
+      (url.protocol==='https:' || url.protocol==='http:') && url.origin===origin
+    ) || (
+      url.protocol==='https:' && accessOrigin!==null &&
+      url.origin===accessOrigin
+    );
   } catch {
     return false;
   }
