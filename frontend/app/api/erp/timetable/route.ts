@@ -55,8 +55,10 @@ export async function GET(request:NextRequest){
       return fail('ERP returned the search form instead of a timetable [TT_SEARCH_FORM]',502);
     if(reason.startsWith('ERP timetable grid not found: TT_EMPTY_RESULT'))
       return fail('ERP returned no timetable entries for this session [TT_EMPTY_RESULT]',502);
+    if(reason.startsWith('ERP timetable grid not found: TT_TIMETABLE_HEADER_CHANGED'))
+      return fail('ERP returned a timetable page but its table headers changed [TT_TIMETABLE_HEADER_CHANGED]',502);
     if(reason.startsWith('ERP timetable grid not found: TT_UNRECOGNIZED_TABLE'))
-      return fail('ERP returned a table with an unrecognized layout [TT_UNRECOGNIZED_TABLE]',502);
+      return fail('ERP returned tables but none matched the timetable grid [TT_UNRECOGNIZED_TABLE]',502);
     if(reason.startsWith('ERP timetable grid not found'))
       return fail('ERP did not return a recognizable timetable response [TT_UNEXPECTED_RESPONSE]',502);
     if(reason.startsWith('ERP timetable day row changed')||
