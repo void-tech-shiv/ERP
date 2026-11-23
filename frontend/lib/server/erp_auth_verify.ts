@@ -14,7 +14,7 @@ export type ERPPageEvidence = {
 };
 
 export function inspectERPPage(html: string, studentId: string): ERPPageEvidence {
-  if (!/^[0-9]{5,24}$/.test(studentId) || html.length > 1_000_000) {
+  if (!/^[0-9]{5,24}$/.test(studentId) || html.length > 2_000_000) {
     return { verified: false, loginForm: false, identityVisible: false,
       welcomeVisible: false, dashboardMarkers: false };
   }
