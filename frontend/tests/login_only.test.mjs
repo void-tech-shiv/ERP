@@ -36,10 +36,21 @@ test('academic terms and attendance are explicitly loaded only in the authentica
   assert.match(attendance,/Select semester/);
   assert.match(attendance,/X-Attendly-CSRF/);
 });
-test('weighted LTPS calculation and planner operate on real parsed records', () => {
+test('only Attendance remains in the sidebar', () => {
+  const sidebar=attendance.match(/<aside className="at-sidebar">([\s\S]*?)<\/aside>/)?.[1]||'';
+  assert.match(sidebar,/>Attendance<\/span>/);
+  assert.doesNotMatch(sidebar,/Overview|My subjects|Attendance planner|Stay in the know/);
+  assert.equal((sidebar.match(/at-nav-item/g)||[]).length,1);
+});
+test('dashboard does not show crossed-out metric cards or secondary screens', () => {
+  assert.doesNotMatch(attendance,/<Metrics\s*\/>|at-metrics|at-metric-value/);
+  assert.doesNotMatch(attendance,/setSection\(|section==='subjects'|section==='planner'/);
+  assert.doesNotMatch(attendance,/View all/);
+  assert.match(attendance,/<SubjectList\s*\/>/);
+  assert.match(attendance,/at-goal-ring/);
   assert.match(attendance,/totals\(course\)/);
-  assert.match(attendance,/projection\(summary\.attended,summary\.conducted,target,futurePart\)/);
-  assert.match(attendance,/WEIGHTS\[part\]/);
+  assert.match(attendance,/\/api\/erp\/terms/);
+  assert.match(attendance,/\/api\/erp\/attendance/);
 });
 test('cache stores attendance only and clears on logout', () => {
   assert.match(attendance,/writeERP\(\{studentId,academicYear:year,semester,courses,savedAt\}\)/);
