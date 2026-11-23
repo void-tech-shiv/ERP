@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Attendly",
+    "slug": "attendly-mobile",
+    "scheme": "attendly",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.voidtechshiv.attendly"
+    },
+    "android": {
+      "package": "com.voidtechshiv.attendly",
+      "versionCode": 1,
+      "permissions": [
+        "INTERNET"
+      ],
+      "usesCleartextTraffic": false
+    },
+    "extra": {
+      "appPurpose": "Independent student ERP companion"
+    }
+  }
+}
