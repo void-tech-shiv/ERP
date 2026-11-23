@@ -64,6 +64,41 @@ test('accepts standard S-prefixed period headers from real-world schedules',()=>
   const parsed=parseTimetable(sHeaders);
   assert.deepEqual(parsed.periods.slice(0,3),[1,2,3]);
 });
+test('parses the observed 25-column five-day ERP grid without a header row',()=>{
+  const slots=24;
+  const cells=(day,entries={})=>'<tr><td>'+day+'</td>'+
+    Array.from({length:slots},(_,i)=>'<td>'+(entries[i+1]||'-')+'</td>').join('')+'</tr>';
+  const result='<html><h3>Academic Timetable</h3><table><tbody>'+
+    cells('Mon',{3:'25CS2207E-L - S-3 - RoomNo-C107',24:'25AD2203E-P - S-1 - RoomNo-C409'})+
+    cells('Tue',{5:'25CS2206E-L - S-5 - RoomNo-C111'})+
+    cells('Wed',{4:'25CS3112E-S - S-1 - RoomNo-C111'})+
+    cells('Fri',{8:'25SP2105E-S - S-1 - RoomNo-CRICKET NETS'})+
+    cells('Sat',{6:'25CS2207E-S - S-3 - RoomNo-C107'})+
+    '</tbody></table></html>';
+  const parsed=parseTimetable(result);
+  assert.deepEqual(parsed.days,['Mon','Tue','Wed','Fri','Sat']);
+  assert.equal(parsed.periods.length,24);
+  assert.equal(parsed.periods.at(-1),24);
+  assert.equal(parsed.periodsInferred,true);
+  assert.equal(parsed.classes.length,6);
+  assert.deepEqual({day:parsed.classes[1].day,period:parsed.classes[1].period,room:parsed.classes[1].room},
+    {day:'Mon',period:24,room:'C409'});
+});
+test('accepts a 25-column grid with explicit university period numbers',()=>{
+  const labels='<tr><th>Day</th>'+Array.from({length:24},(_,i)=>'<th>'+(i+1)+'</th>').join('')+'</tr>';
+  const make=(day)=>'<tr><td>'+day+'</td>'+Array.from({length:24},(_,i)=>
+    '<td>'+(i===3?'25CS2207E-L - S-3 - RoomNo-C107':'-')+'</td>').join('')+'</tr>';
+  const parsed=parseTimetable('<table><thead>'+labels+'</thead><tbody>'+make('Mon')+make('Tue')+
+    make('Wed')+make('Fri')+make('Sat')+'</tbody></table>');
+  assert.equal(parsed.periodsInferred,false);
+  assert.equal(parsed.periods.length,24);
+  assert.equal(parsed.classes[0].period,4);
+});
+test('never infers classes from a non-timetable 25-column table',()=>{
+  const day=(label)=>'<tr><td>'+label+'</td>'+('<td>PRIVATE</td>'.repeat(24))+'</tr>';
+  assert.throws(()=>parseTimetable('<table>'+day('Mon')+day('Tue')+day('Wed')+day('Fri')+day('Sat')+'</table>'),
+    /grid not found/);
+});
 test('rejects forbidden response instead of displaying fake class data',()=>{
   assert.throws(()=>parseTimetable('<html><div class="site-error"><h1>Forbidden</h1><h5>You are not allowed to perform this action.</h5></div></html>'),
     /ERP denied timetable access/);
