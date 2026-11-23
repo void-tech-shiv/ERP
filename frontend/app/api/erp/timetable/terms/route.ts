@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { fail, getERPState, setERPState, testingEnabled, upstream } from '../../../../lib/server/erp';
-import { parseTimetableTerms, TIMETABLE_FORM_PATH } from '../../../../lib/server/erp_timetable';
+import { fail, getERPState, setERPState, testingEnabled, upstream } from '../../../../../lib/server/erp';
+import { parseTimetableTerms, TIMETABLE_FORM_PATH } from '../../../../../lib/server/erp_timetable';
 
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
