@@ -44,6 +44,26 @@ test('parses weekly day-period grid and all available LTPS/rooms',()=>{
   assert.equal(lecture.room,'C410');
   assert.equal(result.classes.at(-1)?.room,'CRICKET NETS');
 });
+test('finds a real timetable header after an ERP title row',()=>{
+  const extraHeader=grid.replace('<thead>'+header,
+    '<thead><tr><th colspan="12">Academic Timetable</th></tr>'+header);
+  const parsed=parseTimetable(extraHeader);
+  assert.equal(parsed.periods.length,11);
+  assert.equal(parsed.classes[0].courseCode,'25CS2103E');
+});
+test('skips unrelated layout tables before the actual timetable grid',()=>{
+  const withOtherTable=grid.replace('<h3>Academic Timetable</h3>',
+    '<table><tr><th>Notice</th></tr><tr><td>Another panel</td></tr></table><h3>Academic Timetable</h3>');
+  const parsed=parseTimetable(withOtherTable);
+  assert.equal(parsed.classes.length,6);
+});
+test('accepts standard S-prefixed period headers from real-world schedules',()=>{
+  const sHeaders=grid.replace('<th>1</th>','<th>S1</th>')
+    .replace('<th>2</th>','<th>S2</th>')
+    .replace('<th>3</th>','<th>S3</th>');
+  const parsed=parseTimetable(sHeaders);
+  assert.deepEqual(parsed.periods.slice(0,3),[1,2,3]);
+});
 test('rejects forbidden response instead of displaying fake class data',()=>{
   assert.throws(()=>parseTimetable('<html><div class="site-error"><h1>Forbidden</h1><h5>You are not allowed to perform this action.</h5></div></html>'),
     /ERP denied timetable access/);
