@@ -64,7 +64,7 @@ function mergeCookies(out: Record<string,string>, res: Response) {
       out[name] = value;
   }
 }
-export async function upstream(path: string, state: ERPState | {upstream: Record<string,string>}, method = 'GET', body?: URLSearchParams) {
+export async function upstream(path: string, state: ERPState | {upstream: Record<string,string>}, method = 'GET', body?: URLSearchParams | FormData) {
   const response = await fetch(url(path), {
     method, redirect: 'manual', cache: 'no-store',
     headers: {
@@ -72,13 +72,17 @@ export async function upstream(path: string, state: ERPState | {upstream: Record
       // Match the ordinary same-site request context of the official ERP form.
       // Yii and front-end validation may require Origin/Referer checks.
       ...(method === 'POST' ? {
-        'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',
+        // Browser submits the observed Yii login form as multipart/form-data.
+        // Let fetch generate the boundary automatically for FormData.
+        ...(body instanceof FormData ? {} : {
+          'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8',
+        }),
         'X-Requested-With':'XMLHttpRequest',
         'Origin':ROOT,
-        'Referer':ROOT+'/index.php',
-        'Accept':'*/*',
+        'Referer':ROOT+'/',
+        'Accept':'text/html, */*; q=0.01',
       } : {
-        'Referer':ROOT+'/index.php',
+        'Referer':ROOT+'/',
       }),
     }, body,
     signal: AbortSignal.timeout(12000),
