@@ -1,30 +1,16 @@
-# Attendly Android — Student Workspace
+# Attendly Android — original ERP app with a mobile theme
 
-Attendly v0.2.0 is an offline-first mobile dashboard styled after a modern student workspace.
+This Android v0.3.0 restores the **existing Attendly ERP-connected application**, replacing the mistakenly added offline/sample dashboard from v0.2.0.
 
-## Implemented screens
+The WebView opens the existing protected Attendly Cloudflare staging application, with its authentic login and manually completed CAPTCHA. After authentication, the existing ERP Overview, Attendance, CGPA, Exam Seating, Timetable and Settings are unchanged.
 
-- Overview with personalized greeting, sample-data warning, attendance, classes, tasks and privacy-first CGPA
-- Expandable navy side drawer and fixed five-tab navigation
-- Timetable with weekday selection and editable local class entries
-- Attendance with per-subject attended/conducted counts and LTPS-weighted calculations (L=100%, T=50%, P=50%, S=25%)
-- Planner with add/complete/delete task actions
-- Grades & GPA with default-hidden CGPA
-- Settings: nickname, program, university, semester, CGPA, attendance target, theme and sample data toggle
-- Separate protected ERP beta link that launches in the phone's external browser
+The Android app adds **presentation-only** assets:
+- A navy slide-out drawer using the original six navigation entries
+- Mint highlights, rounded cards and navy page accents inspired by the reference screenshots
+- A hamburger menu and tap-outside/Android-back dismissal
 
-All manually entered information is stored locally on this device, in Android WebView localStorage. Demo records are explicitly labeled as sample data, not fetched ERP records.
+It **does not** add tasks, invented attendance, local grade inputs or mock data. The original ERP session, attendance cache, settings (nickname, semester and default-hidden CGPA), API requests, logout and CAPTCHA all remain in the hosted app.
 
-## GitHub Actions / APK
+Only the trusted Attendly app origin receives the appearance JavaScript. The Cloudflare Access identity page is never modified, and other external links open in the device browser. TLS errors are blocked. No passwords or ERP secrets are embedded in the APK.
 
-Push to main with changes in android/ automatically builds an Android debug APK, uploads it to the workflow, and publishes a public GitHub prerelease with the downloadable APK asset.
-
-Workflow: https://github.com/void-tech-shiv/ERP/actions/workflows/android-apk.yml
-
-## Security
-
-The Android dashboard loads only bundled HTML/CSS/JS from the virtual HTTPS asset origin appassets.androidplatform.net. It does not load remote application JS, collect ERP passwords, or transmit student profile/attendance to a third-party server. External HTTPS pages open in the phone's system browser.
-
-The private ERP beta URL remains behind Cloudflare Access. The APK does not bypass Cloudflare Access or make ERP student sign-in public.
-
-Public use with real ERP credentials remains gated pending university authorization, privacy/security review, rate limits, monitoring and consent controls. This is not an official KL University app or a Play Store release. The APK is debug-signed for testing.
+This is still a **debug APK for private testing**. Cloudflare Access remains enabled and public student ERP login is not authorized.

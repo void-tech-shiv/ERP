@@ -1,0 +1,100 @@
+/* Attendly MOBILE: appearance only; underlying ERP pages and components unchanged. */
+:root {
+  --accent:#34b795!important;
+  --accent-dark:#209d81!important;
+  --accent-light:#e8f8f3!important;
+  --bg:#f6f8fc!important;
+  --line:#e6ebf3!important;
+  --ink:#182940!important;
+  --muted:#7e8ba0!important;
+}
+:focus-visible{outline-color:#84e2c1!important}
+.at-app{background:#f6f8fc}
+.at-app .at-app-topbar{background:#fff;position:sticky;top:0;z-index:22;border-color:#e5eaf2}
+.at-app .at-icon-button{border-radius:14px}
+.at-app .at-session-badge{background:#e8f8f0;color:#228a70;border-color:#d3eee2}
+.at-app .at-term-card,.at-app .at-panel,.at-app .at-metric,.at-app .at-home-stat,.at-app .at-settings-panel,
+.at-app .at-time-day-card,.at-app .at-seating-panel{border-radius:20px;box-shadow:0 10px 30px #17274009}
+.at-app .at-home-hero{background:linear-gradient(117deg,#142841 0%,#23506a 100%);box-shadow:0 18px 37px #153d4f27}
+.at-app .at-home-hero [class*="highlight"],.at-app .at-home-hero .at-section-label{color:#93ebc7}
+.at-app .at-btn-primary{background:#1caa8b;color:#fff;box-shadow:none}
+.at-app .at-btn-primary:not(:disabled):hover{background:#178b73}
+.at-app .at-home-attendance-track>div{background:linear-gradient(90deg,#3bcf9f,#129a77)}
+.at-app .at-settings-toggle.enabled{background:#37b998}
+.at-app .at-settings-icon,.at-app .at-term-icon{background:#e8f8f2;color:#28a485}
+.at-app .at-home-visibility{background:#e9f8f2;border-color:#cce8df;color:#168d74}
+.at-app .at-home-stat--cgpa{background:linear-gradient(145deg,#eef9f5,#fff 75%)}
+.at-app .at-home-stat--attendance{background:linear-gradient(145deg,#eaf8f5,#fff 75%)}
+.at-app .at-home-class--S{--home-accent:#27b493;--home-bg:#e8f8f2}
+.at-app .at-cgpa-score{color:#1faa8c}
+.at-app .at-progress-fill.at-fill-primary{background:#35bb9a}
+.at-app .at-breadcrumb strong{color:#1b2e48}
+.at-app .at-sidebar {
+  position:fixed!important;
+  inset:0 auto 0 0!important;
+  height:100dvh!important;
+  width:min(330px,86vw)!important;
+  max-width:330px!important;
+  z-index:130!important;
+  display:flex!important;
+  flex-direction:column!important;
+  background:#111e32!important;
+  border:0!important;
+  padding:43px 18px 24px!important;
+  box-shadow:16px 0 42px #08152231;
+  transform:translateX(-103%);
+  transition:transform .24s ease;
+  overflow-y:auto;
+}
+body.at-mobile-open .at-app .at-sidebar{transform:translateX(0)}
+.at-app{grid-template-columns:minmax(0,1fr)!important}
+.at-app .at-app-main{min-width:0}
+.at-app .at-sidebar-brand{padding:5px 9px 25px!important}
+.at-app .at-sidebar-brand .at-logo-mark{background:#7ce1b9;color:#16372e;box-shadow:none;width:50px;height:50px;border-radius:13px}
+.at-app .at-sidebar-brand .at-logo-word{color:#f4f8ff;font-size:24px}
+.at-app .at-sidebar-brand .at-logo-word>span{color:#7ce1b9}
+.at-app .at-sidebar-brand small{display:block!important;color:#8ea0b9!important;margin:11px 0 0 1px!important;letter-spacing:2px;font-size:9px}
+.at-app .at-sidebar-brand:after{
+  content:"KL University\A Student workspace";
+  white-space:pre-line;line-height:1.7;display:block;
+  background:#20324e;color:#eaf3ff;
+  border:1px solid #314661;border-radius:15px;
+  padding:15px 18px;margin-top:28px;font-size:13px;font-weight:750;
+}
+.at-app .at-side-nav{display:flex!important;flex-direction:column!important;overflow:visible!important;gap:6px!important;padding:4px 0!important}
+.at-app .at-side-nav:before{content:"WORKSPACE";display:block;color:#7488a7;font-size:10px;font-weight:850;letter-spacing:2.3px;padding:14px 19px 11px}
+.at-app .at-nav-item{height:53px!important;min-height:53px!important;min-width:0;width:100%!important;
+  font-size:13px!important;gap:15px!important;padding:0 17px!important;border-radius:14px!important;
+  color:#b5c3d7!important;background:transparent!important;white-space:normal!important}
+.at-app .at-nav-item svg{width:21px!important;height:21px!important;flex-shrink:0}
+.at-app .at-nav-item.active{color:#a0f0cb!important;background:#283e58!important}
+.at-app .at-nav-item:hover{background:#22354f!important;color:#a0f0cb!important}
+.at-app .at-nav-active-dot{display:block!important;background:#83ebbd;width:7px;height:7px}
+.at-app .at-sidebar-tip{display:none!important}
+.at-app .at-sidebar-spacer{display:block!important;flex:1!important;min-height:20px}
+.at-app .at-side-connected{display:flex!important;border:1px solid #304961;background:#1b3246;padding:14px;border-radius:14px;margin-top:20px}
+.at-app .at-side-connected strong{color:#b4efd9}
+.at-app .at-side-connected small{color:#95acc2}
+.at-app .at-side-legal{display:block!important;color:#8293ab!important;padding:14px 12px 0!important}
+#at-mobile-menu-trigger{display:none;position:fixed;z-index:90;top:11px;left:12px;
+  height:45px;width:45px;background:#fff;color:#193048;border:1px solid #e4eaf2;
+  border-radius:13px;align-items:center;justify-content:center;
+  box-shadow:0 6px 18px #15293a0c;font-size:23px;cursor:pointer}
+body.at-mobile-shell #at-mobile-menu-trigger{display:flex}
+body.at-mobile-open #at-mobile-menu-trigger{opacity:0;pointer-events:none}
+#at-mobile-drawer-backdrop{display:none;position:fixed;inset:0;z-index:120;background:#0b142594;border:0}
+body.at-mobile-open #at-mobile-drawer-backdrop{display:block}
+body.at-mobile-shell .at-app .at-app-topbar{padding-left:72px!important}
+body.at-mobile-shell .at-app .at-breadcrumb{min-width:0}
+body.at-mobile-shell .at-app .at-top-actions{gap:7px}
+@media(max-width:600px){
+  .at-app .at-app-topbar{height:67px!important}
+  .at-app .at-workspace{padding:23px 16px 28px}
+  .at-app .at-home-hero{border-radius:20px}
+  .at-app .at-home-stat-grid{gap:12px}
+  .at-app .at-home-stat{border-radius:18px}
+  .at-app .at-settings-panel{border-radius:18px}
+  .at-app .at-metric{border-radius:18px}
+  body.at-mobile-shell .at-app .at-profile{display:none}
+}
+@media(prefers-reduced-motion:reduce){.at-app .at-sidebar{transition:none}}
