@@ -245,7 +245,7 @@ export default function OverviewStep({
           onClick={()=>void refreshOverview()}><RefreshCw size={17}/>
           {overviewBusy?'Loading…':'Refresh overview'}</button>
       </div>
-      {!canSync&&<p className="at-home-help">Choose your current year and semester in Settings to load your academic data.</p>
+      {!canSync&&<p className="at-home-help">Choose your current year and semester in Settings to load your academic data.</p>}
       {autoLoadCurrentSession&&loadingTimetable&&
         <p className="at-home-help" role="status">Loading your current-semester data from ERP automatically…</p>}
     </section>
