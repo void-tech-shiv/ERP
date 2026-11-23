@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BookOpen, CalendarDays, ChartNoAxesCombined, ChevronRight,
-  CircleHelp, Clock3, GraduationCap, LayoutDashboard, LogOut, RefreshCw, ShieldCheck,
+  CircleHelp, Clock3, GraduationCap, LayoutDashboard, LogOut, RefreshCw, Settings2, ShieldCheck,
   Target,
 } from 'lucide-react';
 import { fmt, totals, PARTS, type Course } from '../lib/calculator';
@@ -12,6 +12,11 @@ import CGPAStep from './CGPAStep';
 import ExamSeatingStep from './ExamSeatingStep';
 import TimetableStep from './TimetableStep';
 import OverviewStep from './OverviewStep';
+import SettingsStep from './SettingsStep';
+import {
+  DEFAULT_STUDENT_PREFERENCES, readStudentPreferences, writeStudentPreferences,
+  sanitizeStudentPreferences, type StudentPreferences,
+} from '../lib/student_preferences';
 
 type Terms = {years: string[]; semesters: string[]};
 type AttendanceResult = {
@@ -98,7 +103,7 @@ export default function AttendanceStep({
   loggingOut:boolean;
   logoutError?:string;
 }) {
-  const [view,setView]=useState<'overview'|'attendance'|'cgpa'|'seating'|'timetable'>('overview');
+  const [view,setView]=useState<'overview'|'attendance'|'cgpa'|'seating'|'timetable'|'settings'>('overview');
   const [terms,setTerms]=useState<Terms|null>(null);
   const [year,setYear]=useState('');
   const [semester,setSemester]=useState('');
@@ -106,6 +111,34 @@ export default function AttendanceStep({
   const [error,setError]=useState('');
   const [display,setDisplay]=useState<DisplayData|null>(null);
   const [target,setTarget]=useState(75);
+  const [preferences,setPreferences]=useState<StudentPreferences>(DEFAULT_STUDENT_PREFERENCES);
+  const [preferencesForStudent,setPreferencesForStudent]=useState('');
+  const activePreferences=preferencesForStudent===studentId?preferences:DEFAULT_STUDENT_PREFERENCES;
+
+  // Only UI preferences (nickname, year, semester and visibility) are persisted.
+  // The storage key is scoped to this authenticated student account.
+  useEffect(()=>{
+    let restored:StudentPreferences=DEFAULT_STUDENT_PREFERENCES;
+    try{restored=readStudentPreferences(window.localStorage,studentId);}
+    catch{/* Defaults work even when local storage is unavailable. */}
+    setPreferences(restored);
+    setPreferencesForStudent(studentId);
+    setYear(restored.currentYear);
+    setSemester(restored.currentSemester);
+  },[studentId]);
+
+  function savePreferences(next:StudentPreferences){
+    const clean=sanitizeStudentPreferences(next);
+    if(terms&&clean.currentYear&&clean.currentSemester&&
+      (!terms.years.includes(clean.currentYear)||
+       !terms.semesters.includes(clean.currentSemester)))return;
+    setPreferences(clean);
+    setPreferencesForStudent(studentId);
+    setYear(clean.currentYear);
+    setSemester(clean.currentSemester);
+    try{writeStudentPreferences(window.localStorage,studentId,clean);}
+    catch{/* Preferences are still applied during this session. */}
+  }
 
   useEffect(()=>{
     let active=true;
@@ -153,15 +186,6 @@ export default function AttendanceStep({
     void loadTerms(controller.signal);
     return ()=>controller.abort();
   },[studentId,loadTerms]);
-
-  // Reuse the student's last saved attendance term only when it is still
-  // offered by the ERP. The Overview labels this as last synced, not current.
-  useEffect(()=>{
-    if(!display||!terms)return;
-    if(!terms.years.includes(display.academicYear)||!terms.semesters.includes(display.semester))return;
-    setYear(previous=>previous||display.academicYear);
-    setSemester(previous=>previous||display.semester);
-  },[display,terms]);
 
   async function syncAttendance(){
     if(!terms||!terms.years.includes(year)||!terms.semesters.includes(semester)){
@@ -239,13 +263,18 @@ export default function AttendanceStep({
           <Clock3 size={19}/><span>Timetable</span>
           {view==='timetable'&&<span className="at-nav-active-dot"/>}
         </button>
+        <button type="button" className={'at-nav-item '+(view==='settings'?'active':'')}
+          aria-current={view==='settings'?'page':undefined} onClick={()=>setView('settings')}>
+          <Settings2 size={19}/><span>Settings</span>
+          {view==='settings'&&<span className="at-nav-active-dot"/>}
+        </button>
       </nav>
     </aside>
 
     <div className="at-app-main">
       <header className="at-app-topbar">
         <div className="at-breadcrumb"><span>Workspace</span><ChevronRight size={14}/>
-          <strong>{view==='overview'?'Overview':view==='attendance'?'Attendance':view==='cgpa'?'CGPA':view==='seating'?'Exam Seating':'Timetable'}</strong></div>
+          <strong>{view==='overview'?'Overview':view==='attendance'?'Attendance':view==='cgpa'?'CGPA':view==='seating'?'Exam Seating':view==='settings'?'Settings':'Timetable'}</strong></div>
         <div className="at-top-actions">
           <span className="at-top-connected"><span className="at-online-dot"/> Connected to ERP</span>
           <div className="at-profile"><span className="at-profile-avatar"><GraduationCap size={17}/></span>
@@ -257,9 +286,16 @@ export default function AttendanceStep({
 
       <main className="at-workspace">
         {logoutError&&<div className="at-message at-message-error" role="alert">{logoutError}</div>}
-        {view==='overview' ? <OverviewStep
+        {view==='settings' ? <SettingsStep
+          preferences={activePreferences} terms={terms} busy={busy}
+          onSave={savePreferences}
+        /> : view==='overview' ? <OverviewStep
           studentId={studentId} terms={terms} year={year} semester={semester}
           onYearChange={setYear} onSemesterChange={setSemester}
+          nickname={activePreferences.nickname}
+          onNicknameChange={nickname=>savePreferences({...activePreferences,nickname})}
+          showCgpa={activePreferences.showCgpa}
+          onCgpaVisibilityChange={showCgpa=>savePreferences({...activePreferences,showCgpa})}
           attendance={display} attendanceBusy={busy} attendanceError={error}
           onRefreshAttendance={syncAttendance} onNavigate={setView}
         /> : view==='cgpa' ? <CGPAStep/> : view==='seating' ? <ExamSeatingStep/> : view==='timetable' ? <TimetableStep/> : <>
