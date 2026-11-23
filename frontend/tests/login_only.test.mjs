@@ -47,7 +47,7 @@ test('academic year and semester appear immediately and terms load after verifie
   assert.doesNotMatch(attendance,/Select academic session|at-term-first/);
   assert.doesNotMatch(attendance,/\{!terms\s*\?/);
   assert.match(attendance,/disabled=\{busy\|\|!terms\|\|!year\|\|!semester\}/);
-  assert.equal((attendance.match(/syncAttendance\(\)/g)||[]).length,1,
+  assert.equal((attendance.match(/onClick=\{\(\)=>void syncAttendance\(\)\}/g)||[]).length,1,
     'attendance must sync only from the explicit button');
 });
 test('only Attendance remains in the sidebar', () => {
