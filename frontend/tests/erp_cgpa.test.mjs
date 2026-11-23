@@ -64,7 +64,7 @@ test('CGPA view is fetched on tab open, not cached with credentials',()=>{
   const ui=readFileSync(new URL('../components/CGPAStep.tsx',import.meta.url),'utf8');
   const parent=readFileSync(new URL('../components/AttendanceStep.tsx',import.meta.url),'utf8');
   assert.match(ui,/api\/erp\/cgpa/);
-  assert.match(parent,/view==='cgpa' \? <CGPAStep\/>/);
+  assert.match(parent,/view==='cgpa' \? <CGPAStep key=\{studentId\}\/>/);
   assert.match(parent,/onClick=\{\(\)=>setView\('cgpa'\)\}/);
   // Comments explaining that storage is forbidden are not executable usage.
   const executable=ui.replace(/^\s*\/\/.*$/gm,'').replace(/\/\*[\s\S]*?\*\//g,'');
