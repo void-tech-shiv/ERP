@@ -66,5 +66,7 @@ test('CGPA view is fetched on tab open, not cached with credentials',()=>{
   assert.match(ui,/api\/erp\/cgpa/);
   assert.match(parent,/view==='cgpa' \? <CGPAStep\/>/);
   assert.match(parent,/onClick=\{\(\)=>setView\('cgpa'\)\}/);
-  assert.doesNotMatch(ui,/localStorage|IndexedDB|writeERP/);
+  // Comments explaining that storage is forbidden are not executable usage.
+  const executable=ui.replace(/^\s*\/\/.*$/gm,'').replace(/\/\*[\s\S]*?\*\//g,'');
+  assert.doesNotMatch(executable,/\blocalStorage\b|\bIndexedDB\b|\bwriteERP\b/);
 });
