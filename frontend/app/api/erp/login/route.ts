@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { load } from 'cheerio';
 import { resolveERPRedirect, type RedirectError } from '../../../../lib/server/erp_redirect';
 import { inspectERPPage } from '../../../../lib/server/erp_auth_verify';
+import { attendanceFormDetected, cookieTransition } from '../../../../lib/server/erp_diagnostics';
 import {
   clearERPState, fail, getERPState, setERPState, testingEnabled,
   upstream, validOrigin, validateCSRF
@@ -31,6 +32,12 @@ type SafeDiagnostic = {
   loginFormDetected?: boolean;
   studentIdentityVisible?: boolean;
   dashboardMarkersDetected?: boolean;
+  cookieCountBefore?: number;
+  cookieCountAfterLogin?: number;
+  cookieChangedOnLogin?: boolean;
+  cookieCountAfterDashboard?: number;
+  attendanceFormHttpStatus?: number;
+  attendanceFormAccessible?: boolean;
 };
 
 function safeResponseType(html: string): SafeDiagnostic['loginResponseType'] {
@@ -118,8 +125,15 @@ export async function POST(request:Request) {
       'LoginForm[qr_code]':'',
       'login-button':'',
     });
+    const cookiesBeforeLogin={...state.upstream};
     const result=await upstream(state.loginAction,state,'POST',form);
-    const diagnostic: SafeDiagnostic={stage:'login-post',loginHttpStatus:result.status};
+    const cookieSignal=cookieTransition(cookiesBeforeLogin,state.upstream);
+    const diagnostic: SafeDiagnostic={
+      stage:'login-post',loginHttpStatus:result.status,
+      cookieCountBefore:cookieSignal.before,
+      cookieCountAfterLogin:cookieSignal.after,
+      cookieChangedOnLogin:cookieSignal.changed,
+    };
     let dashboardUrl=ERP_ROOT+'/index.php?r=site%2Findexindi';
     if([301,302,303].includes(result.status)) {
       diagnostic.loginResponseType='redirect';
@@ -158,6 +172,7 @@ export async function POST(request:Request) {
       diagnostic.stage='dashboard';
       const page=await upstream(dashboardUrl,state);
       diagnostic.dashboardHttpStatus=page.status;
+      diagnostic.cookieCountAfterDashboard=Object.keys(state.upstream).length;
       if([301,302,303].includes(page.status)) {
         diagnostic.stage='redirect';
         if(hop>=4) {
@@ -206,6 +221,20 @@ export async function POST(request:Request) {
         diagnostic.fallback='dashboard-probe';
         dashboardUrl=fixedDashboard;
         continue;
+      }
+      // A private, fixed upstream probe distinguishes an unavailable
+      // authenticated attendance page from an overly strict dashboard matcher.
+      // Never expose the response, CSRF, cookies, raw URL or student details.
+      try {
+        const probe=await upstream(
+          ERP_ROOT+'/index.php?r=studentattendance%2Fstudentdailyattendance%2Fsearchgetinput',
+          state
+        );
+        diagnostic.attendanceFormHttpStatus=probe.status;
+        diagnostic.attendanceFormAccessible=probe.status===200 &&
+          attendanceFormDetected(await probe.text());
+      } catch {
+        diagnostic.attendanceFormAccessible=false;
       }
       return failure('ERP_LOGIN_NOT_CONFIRMED',401,diagnostic);
     }
