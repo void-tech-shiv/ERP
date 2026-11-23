@@ -33,7 +33,14 @@ export function inspectERPPage(html: string, studentId: string): ERPPageEvidence
   const visible=$('body').text().replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();
   const idPattern=new RegExp('(^|\\D)'+studentId+'(?=\\D|$)');
   const identityVisible=idPattern.test(visible);
-  const welcomeVisible=new RegExp('\\bWelcome\\s+'+studentId+'\\b','i').test(visible);
+  const welcomePattern=new RegExp('\\bWelcome\\s+'+studentId+'\\b','i');
+  // Cheerio .text() concatenates adjacent block elements without a separator.
+  // Check trusted visible heading elements independently so the prior section's
+  // ending word cannot swallow the word boundary before "Welcome".
+  const headingWelcome=$('h1,h2,h3,h4,h5,h6').toArray().some(element=>
+    welcomePattern.test($(element).text().replace(/\s+/g,' ').trim())
+  );
+  const welcomeVisible=headingWelcome||welcomePattern.test(visible);
   const dashboardMarkers=hasAttendance || hasLogout ||
     /Journals\s*&\s*Conferences|Awards\s*&\s*Recognitions/i.test(visible);
   // Match the observed ERP dashboard, with a conservative alternative
