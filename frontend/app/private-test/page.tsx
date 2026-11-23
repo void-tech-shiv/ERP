@@ -1,13 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { fmt, totals, type Course, type Part } from '../../lib/calculator';
-import { clearERP, readERP, writeERP } from '../../lib/erp_cache';
 
-type Terms={years:string[];semesters:string[]};
-type Session={active:boolean;studentId?:string;csrfToken?:string};
-const COMPONENTS:Part[]=['L','T','P','S'];
 
 async function call(path:string, options:RequestInit={}):Promise<any>{
   const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options});
@@ -47,9 +42,8 @@ async function call(path:string, options:RequestInit={}):Promise<any>{
       Number.isInteger(details?.cookieCountBefore) ? 'cookiesBefore='+details.cookieCountBefore : '',
       Number.isInteger(details?.cookieCountAfterLogin) ? 'cookiesAfterLogin='+details.cookieCountAfterLogin : '',
       typeof details?.cookieChangedOnLogin==='boolean' ? 'cookiesUpdated='+details.cookieChangedOnLogin : '',
-      Number.isInteger(details?.cookieCountAfterDashboard) ? 'cookiesAfterDashboard='+details.cookieCountAfterDashboard : '',
-      Number.isInteger(details?.attendanceFormHttpStatus) ? 'attendanceProbe='+details.attendanceFormHttpStatus : '',
-      typeof details?.attendanceFormAccessible==='boolean' ? 'attendanceForm='+details.attendanceFormAccessible : ''
+      Number.isInteger(details?.cookieCountAfterDashboard) ? 'cookiesAfterDashboard='+details.cookieCountAfterDashboard : ''
+
     ].filter(Boolean).join(' · ');
     throw new Error((payload.error||'ERP request failed ('+response.status+')') +
       (safeTrace ? ' [Diagnostic: '+safeTrace+']' : ''));
@@ -57,157 +51,191 @@ async function call(path:string, options:RequestInit={}):Promise<any>{
   return payload;
 }
 
-export default function PrivateERPTest(){
+export default function PrivateERPTest() {
   const [studentId,setStudentId]=useState('');
   const [password,setPassword]=useState('');
   const [captcha,setCaptcha]=useState('');
   const [captchaImage,setCaptchaImage]=useState('');
   const [csrf,setCsrf]=useState('');
   const [stage,setStage]=useState<'checking'|'initial'|'challenge'|'authenticated'>('checking');
-  const [terms,setTerms]=useState<Terms>({years:[],semesters:[]});
-  const [year,setYear]=useState(''),[semester,setSemester]=useState('');
-  const [courses,setCourses]=useState<Course[]>([]);
   const [error,setError]=useState('');
   const [busy,setBusy]=useState(false);
   const [consent,setConsent]=useState(false);
-  const [refreshed,setRefreshed]=useState('');
 
-  async function refreshTerms(){
-    const result=await call('/api/erp/terms');
-    setTerms(result);
-    setYear(result.years.at(-1)||'');
-    setSemester(result.semesters.find((v:string)=>v.toLowerCase().includes('even'))||result.semesters[0]||'');
-  }
-
+  // Phase 1 intentionally ONLY checks the ERP session. No academic year,
+  // semester or attendance requests run on mount or after successful login.
   useEffect(()=>{
-    let live=true;
-    void call('/api/erp/session').then(async s=>{
-      if(!live)return;
-      if(s.active){
-        setCsrf(s.csrfToken);setStudentId(s.studentId);setStage('authenticated');
-        await refreshTerms();
-        const cached=await readERP(s.studentId);
-        if(live && cached){
-          setCourses(cached.courses);
-          setYear(cached.academicYear);
-          setSemester(cached.semester);
-          setRefreshed(cached.savedAt+' (cached)');
-        }
+    let active=true;
+    void call('/api/erp/session').then(session=>{
+      if(!active)return;
+      if(session.active===true && session.studentId && session.csrfToken){
+        setStudentId(String(session.studentId));
+        setCsrf(String(session.csrfToken));
+        setStage('authenticated');
       } else setStage('initial');
-    }).catch(e=>{if(live){setStage('initial');setError(e.message)}});
-    return ()=>{live=false};
+    }).catch(e=>{
+      if(active){
+        setStage('initial');
+        setError(e instanceof Error?e.message:'Could not restore ERP session');
+      }
+    });
+    return ()=>{active=false};
   },[]);
 
-  async function challenge(){
-    setBusy(true);setError('');setCaptcha('');setPassword('');
-    try {
-      const d=await call('/api/erp/challenge',{method:'POST'});
-      setCaptchaImage(d.image);setCsrf(d.csrfToken);setStage('challenge');
-    }catch(e){setError((e as Error).message)}
-    finally{setBusy(false)}
-  }
-
-  async function login(e:React.FormEvent){
-    e.preventDefault();setError('');setBusy(true);
-    try {
-      const data=await call('/api/erp/login',{
-        method:'POST',headers:{'Content-Type':'application/json','X-Attendly-CSRF':csrf},
-        body:JSON.stringify({studentId,password,captcha,consent}),
-      });
-      setPassword('');setCaptcha('');setCaptchaImage('');
-      setCsrf(data.csrfToken);setStage('authenticated');
-      await refreshTerms();
+  async function startChallenge(){
+    setBusy(true);
+    setError('');
+    setPassword('');
+    setCaptcha('');
+    setCaptchaImage('');
+    try{
+      const result=await call('/api/erp/challenge',{method:'POST'});
+      if(!result?.csrfToken || typeof result?.image!=='string')
+        throw new Error('ERP CAPTCHA response was incomplete');
+      setCsrf(result.csrfToken);
+      setCaptchaImage(result.image);
+      setStage('challenge');
     }catch(e){
-      setPassword('');setCaptcha('');setCaptchaImage('');setStage('initial');
-      setError((e as Error).message+' Start a fresh CAPTCHA to retry.');
+      setError(e instanceof Error?e.message:'Could not request CAPTCHA');
     }finally{setBusy(false)}
   }
 
-  async function attendance(){
-    setBusy(true);setError('');
-    try {
-      const data=await call('/api/erp/attendance',{
-        method:'POST',headers:{'Content-Type':'application/json','X-Attendly-CSRF':csrf},
-        body:JSON.stringify({academicYear:year,semester}),
+  async function login(e:FormEvent<HTMLFormElement>){
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try{
+      const result=await call('/api/erp/login',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','X-Attendly-CSRF':csrf},
+        body:JSON.stringify({studentId,password,captcha,consent}),
       });
-      if(data.source!=='erp'||!Array.isArray(data.courses))throw new Error('Invalid attendance result');
-      const time=new Date().toLocaleString();
-      setCourses(data.courses);setRefreshed(time);
-      await writeERP({studentId,academicYear:year,semester,courses:data.courses,savedAt:time});
-    }catch(e){setError((e as Error).message)}finally{setBusy(false)}
+      if(result?.ok!==true || result?.verified!==true || result?.stage!=='login-only')
+        throw new Error('ERP login could not be verified');
+      setPassword('');
+      setCaptcha('');
+      setCaptchaImage('');
+      setCsrf(String(result.csrfToken));
+      setStudentId(String(result.studentId));
+      setStage('authenticated');
+    }catch(e){
+      setPassword('');
+      setCaptcha('');
+      setCaptchaImage('');
+      setStage('initial');
+      setError((e instanceof Error?e.message:'ERP verification failed')+
+        ' Request a fresh CAPTCHA to retry.');
+    }finally{setBusy(false)}
   }
 
   async function logout(){
-    setBusy(true);setError('');
+    setBusy(true);
+    setError('');
     try{
-      await call('/api/erp/logout',{method:'POST',headers:{'X-Attendly-CSRF':csrf}});
-      await clearERP();
-      setPassword('');setCaptcha('');setCourses([]);setCsrf('');setStudentId('');
+      await call('/api/erp/logout',{
+        method:'POST',
+        headers:{'X-Attendly-CSRF':csrf}
+      });
+      setPassword('');
+      setCaptcha('');
+      setCaptchaImage('');
+      setStudentId('');
+      setCsrf('');
       setStage('initial');
-    } catch(e){setError((e as Error).message)}
-    finally {setBusy(false)}
+    }catch(e){
+      setError(e instanceof Error?e.message:'Logout could not be confirmed');
+    }finally{setBusy(false)}
   }
 
-  const total=useMemo(()=>{
-    const all=courses.map(totals);
-    const a=all.reduce((v,t)=>v+t.a,0),t=all.reduce((v,t)=>v+t.t,0);
-    return t?100*a/t:null;
-  },[courses]);
+  const displayId=studentId ? '••••'+studentId.slice(-4) : '';
 
-  return <main className="private-screen">
-    <div className="private-shell">
-      <div className="private-nav"><div className="private-logo">attendly<span>.</span></div>
-        <Link href="/">Back to demo</Link></div>
-      <div className="private-heading"><span className="eyebrow">PRIVATE PREVIEW · EXPERIMENTAL</span>
-        <h1>KL ERP attendance sync test</h1>
-        <p>Independent student project. Not affiliated with or endorsed by KL University.
-          Only test your own authorized student account. Do not share this page publicly.</p></div>
-      <div className="private-alert"><strong>Private test, not a production login.</strong> The CAPTCHA must be solved manually.
-        Passwords are used only for the login request, never saved to localStorage or our database.
-        An encrypted short-lived ERP session stays in an HttpOnly browser cookie. Browser refresh may require re-login.
-        University access rules and live reliability are not yet verified.</div>
-      {error&&<div role="alert" className="private-error">{error}</div>}
-
-      {stage==='checking'&&<div className="private-card">Checking private session…</div>}
-      {stage==='initial'&&<div className="private-card">
-        <h2>Begin a new ERP session</h2>
-        <p>Get a new university CAPTCHA to start. This private preview sends the next login request directly from its server to the official ERP.</p>
-        <button disabled={busy} onClick={()=>void challenge()}>{busy?'Connecting…':'Get ERP CAPTCHA'}</button>
-      </div>}
-      {stage==='challenge'&&<form className="private-card private-form" onSubmit={e=>void login(e)}>
-        <h2>ERP student login</h2>
-        <label>Student ID<input inputMode="numeric" autoComplete="username" required value={studentId} onChange={e=>setStudentId(e.target.value)} placeholder="Your ERP student ID"/></label>
-        <label>Password<input type="password" autoComplete="off" required value={password} onChange={e=>setPassword(e.target.value)} placeholder="ERP password"/></label>
-        <div className="captcha-card">
-          {captchaImage&&<img src={captchaImage} alt="University CAPTCHA verification code"/>}
-          <button type="button" onClick={()=>void challenge()} disabled={busy}>New CAPTCHA</button>
-        </div>
-        <label>Enter the CAPTCHA<input required autoComplete="off" value={captcha} onChange={e=>setCaptcha(e.target.value)} placeholder="Characters shown above"/></label>
-        <label className="consent"><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/>
-          I am accessing only my own student ERP account and consent to this experimental sync.</label>
-        <button type="submit" disabled={busy||!consent}>{busy?'Verifying…':'Login and fetch attendance'}</button>
-      </form>}
-      {stage==='authenticated'&&<div className="private-card">
-        <div className="private-session-line"><div><small>AUTHENTICATED TEST SESSION</small><h2>Student {studentId}</h2></div>
-          <button className="secondary" disabled={busy} onClick={()=>void logout()}>Logout</button></div>
-        <div className="private-fields">
-          <label>Academic year<select value={year} onChange={e=>setYear(e.target.value)}>
-            {terms.years.map(x=><option key={x}>{x}</option>)}</select></label>
-          <label>Semester<select value={semester} onChange={e=>setSemester(e.target.value)}>
-            {terms.semesters.map(x=><option key={x}>{x}</option>)}</select></label>
-        </div>
-        <button disabled={busy||!year||!semester} onClick={()=>void attendance()}>{busy?'Syncing…':'Fetch live LTPS attendance'}</button>
-        {courses.length>0&&<>
-          <div className="private-overall"><small>WEIGHTED OVERALL ATTENDANCE</small><strong>{fmt(total)}</strong>
-            <span>{courses.length} subjects · Synced {refreshed}</span></div>
-          <div className="private-table-wrap"><table><thead><tr><th>Subject</th><th>L/T/P/S</th><th>Weighted attendance</th></tr></thead>
-            <tbody>{courses.map(course=><tr key={course.code}><td><strong>{course.name}</strong><small>{course.code}</small></td>
-              <td>{COMPONENTS.filter(part=>course.components[part]).map(part=><div key={part}>{part}: {course.components[part]!.attended}/{course.components[part]!.conducted}</div>)}</td>
-              <td><strong>{fmt(totals(course).percentage)}</strong></td></tr>)}</tbody></table></div>
-          <p className="private-foot">Weighted counts: Lecture 100%, Tutorial 50%, Practical 50%, Skill 25%. The university may use a different eligibility policy.</p>
-        </>}
-      </div>}
-      <p className="private-foot">No bypasses, no unattended CAPTCHA solving. If login fails, verify the ERP is reachable and the university allows this access method.</p>
+  return <main className="private-screen"><div className="private-shell">
+    <div className="private-nav">
+      <div className="private-logo">attendly<span>.</span></div>
+      <Link href="/">Back to demo</Link>
     </div>
-  </main>;
+    <div className="private-heading">
+      <span className="eyebrow">PRIVATE PREVIEW · LOGIN VERIFICATION ONLY</span>
+      <h1>KL ERP login verification</h1>
+      <p>First verify that your authenticated ERP session works.
+        Academic year, semester and attendance retrieval are separate steps
+        and are intentionally not requested on this screen.</p>
+    </div>
+    <div className="private-alert">
+      <strong>Experimental private login test.</strong>
+      The CAPTCHA must be solved manually. Your password is submitted only
+      for ERP authentication, not saved to browser storage or our database.
+      A short-lived encrypted session cookie stays HttpOnly. This is not an official
+      KL University application.
+    </div>
+    {error&&<div role="alert" className="private-error">{error}</div>}
+
+    {stage==='checking'&&<div className="private-card">Checking ERP login session…</div>}
+
+    {stage==='initial'&&<div className="private-card">
+      <h2>Step 1 — Verify ERP login</h2>
+      <p>Request the official CAPTCHA and authenticate your own account.
+        No attendance or semester requests are made during this test.</p>
+      <button type="button" disabled={busy}
+        onClick={()=>void startChallenge()}>{busy?'Connecting…':'Get ERP CAPTCHA'}</button>
+    </div>}
+
+    {stage==='challenge'&&<form className="private-card private-form"
+      onSubmit={e=>void login(e)}>
+      <h2>ERP student login</h2>
+      <label>Student ID
+        <input inputMode="numeric" autoComplete="username" required
+          value={studentId} onChange={e=>setStudentId(e.target.value)}
+          placeholder="ERP student ID"/>
+      </label>
+      <label>Password
+        <input type="password" autoComplete="off" required
+          value={password} onChange={e=>setPassword(e.target.value)}
+          placeholder="ERP password"/>
+      </label>
+      <div className="captcha-card">
+        {captchaImage&&<img src={captchaImage} alt="Official ERP CAPTCHA"/>}
+        <button type="button" disabled={busy} onClick={()=>void startChallenge()}>
+          New CAPTCHA
+        </button>
+      </div>
+      <label>Enter CAPTCHA
+        <input value={captcha} required autoComplete="off"
+          onChange={e=>setCaptcha(e.target.value)} placeholder="Characters shown above"/>
+      </label>
+      <label className="consent">
+        <input type="checkbox" checked={consent}
+          onChange={e=>setConsent(e.target.checked)}/>
+        I am testing only my own authorized ERP account.
+      </label>
+      <button type="submit" disabled={busy||!consent}>
+        {busy?'Verifying login…':'Verify ERP login'}
+      </button>
+    </form>}
+
+    {stage==='authenticated'&&<section className="private-card">
+      <div className="private-session-line">
+        <div>
+          <small>VERIFIED AUTHENTICATED ERP SESSION</small>
+          <h2>ERP Login Verified</h2>
+          <p>Student ID: {displayId}</p>
+        </div>
+        <button type="button" className="secondary" disabled={busy}
+          onClick={()=>void logout()}>{busy?'Signing out…':'Logout'}</button>
+      </div>
+      <div className="private-alert">
+        <strong>Step 1 completed.</strong>
+        The backend verified your ERP identity on the authenticated dashboard.
+        Academic year and semester selection belong to Step 2 and are not
+        loaded by this login-only test.
+      </div>
+    </section>}
+
+    <p className="private-foot">
+      HTTP 302 and 200 responses alone do not prove login success.
+      Only the verified authenticated dashboard enables the success screen.
+      If it fails, share the redacted Diagnostic text only—never passwords,
+      CAPTCHA answers or ERP session tokens.
+    </p>
+  </div></main>;
 }
