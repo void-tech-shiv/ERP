@@ -132,10 +132,14 @@ export default function AttendanceStep({
     if(terms&&clean.currentYear&&clean.currentSemester&&
       (!terms.years.includes(clean.currentYear)||
        !terms.semesters.includes(clean.currentSemester)))return;
+    const termChanged=clean.currentYear!==activePreferences.currentYear||
+      clean.currentSemester!==activePreferences.currentSemester;
     setPreferences(clean);
     setPreferencesForStudent(studentId);
-    setYear(clean.currentYear);
-    setSemester(clean.currentSemester);
+    if(termChanged){
+      setYear(clean.currentYear);
+      setSemester(clean.currentSemester);
+    }
     try{writeStudentPreferences(window.localStorage,studentId,clean);}
     catch{/* Preferences are still applied during this session. */}
   }
