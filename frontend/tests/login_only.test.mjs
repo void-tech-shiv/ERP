@@ -1,43 +1,61 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 
-const page=readFileSync(new URL('../app/private-test/page.tsx',import.meta.url),'utf8');
-const auth=readFileSync(new URL('../app/api/erp/login/route.ts',import.meta.url),'utf8');
-const step=readFileSync(new URL('../components/AttendanceStep.tsx',import.meta.url),'utf8');
+const home = readFileSync(new URL('../app/page.tsx', import.meta.url),'utf8');
+const login = readFileSync(new URL('../app/api/erp/login/route.ts',import.meta.url),'utf8');
+const attendance = readFileSync(new URL('../components/AttendanceStep.tsx',import.meta.url),'utf8');
+const oldRoute = readFileSync(new URL('../app/private-test/page.tsx',import.meta.url),'utf8');
 
-test('login remains independent of academic years and attendance',()=>{
-  assert.doesNotMatch(auth,/studentattendance|attendanceFormDetected|attendanceFormAccessible|attendanceProbe/);
-  assert.match(auth,/inspectERPPage\(html,username\)/);
-  assert.match(auth,/if\(evidence\.verified\)/);
-  assert.match(auth,/if\(!verified\) return failure/);
-  assert.match(auth,/verified:true,stage:'login-only'/);
+test('new homepage contains real ERP login, not a demo or sample data', () => {
+  assert.match(home,/Connect to KL ERP/);
+  assert.match(home,/api\/erp\/session/);
+  assert.match(home,/api\/erp\/challenge/);
+  assert.match(home,/api\/erp\/login/);
+  assert.match(home,/result\.verified !== true/);
+  assert.doesNotMatch(home,/DEMO|DEMO MODE|startDemo|mock records|sample subjects/i);
 });
-test('attendance step appears only after verified login',()=>{
-  assert.match(page,/ERP Login Verified/);
-  assert.match(page,/Verify ERP login/);
-  assert.match(page,/result\?\.ok!==true \|\| result\?\.verified!==true/);
-  assert.match(page,/stage==='authenticated' && csrf && studentId/);
-  assert.match(page,/<AttendanceStep studentId=\{studentId\} csrfToken=\{csrf\}/);
-  assert.doesNotMatch(page,/\/api\/erp\/terms|\/api\/erp\/attendance/);
+test('authenticated attendance UI is accessible only after verified ERP session', () => {
+  assert.match(home,/stage === 'authenticated' && csrf && studentId/);
+  assert.match(home,/<AttendanceStep studentId=\{studentId\} csrfToken=\{csrf\}/);
+  assert.doesNotMatch(home,/api\/erp\/terms|api\/erp\/attendance/);
 });
-test('year and semester API is explicit and never runs on attendance step mount',()=>{
-  assert.match(step,/async function loadTerms\(/);
-  assert.match(step,/async function loadAttendance\(/);
-  assert.match(step,/\/api\/erp\/terms/);
-  assert.match(step,/\/api\/erp\/attendance/);
-  assert.match(step,/Load academic years & semesters/);
-  assert.match(step,/Select academic year/);
-  assert.match(step,/Select semester/);
-  assert.match(step,/X-Attendly-CSRF/);
+test('login route retains its strict authenticated dashboard verification', () => {
+  assert.doesNotMatch(login,/studentattendance|attendanceFormAccessible/);
+  assert.match(login,/inspectERPPage\(html,username\)/);
+  assert.match(login,/if\(evidence\.verified\)/);
+  assert.match(login,/if\(!verified\) return failure/);
+  assert.match(login,/verified:true,stage:'login-only'/);
 });
-test('LTPS weights and overall percent use conducted-weighted totals',()=>{
-  assert.match(step,/PARTS\.filter\(part => course\.components\[part\]\)/);
-  assert.match(step,/totals\(course\)\.percentage/);
-  assert.match(step,/100 \* attended \/ conducted/);
+test('academic terms and attendance are explicitly loaded only in the authenticated dashboard', () => {
+  assert.match(attendance,/async function loadTerms\(/);
+  assert.match(attendance,/async function syncAttendance\(/);
+  assert.match(attendance,/api\/erp\/terms/);
+  assert.match(attendance,/api\/erp\/attendance/);
+  assert.match(attendance,/Select year/);
+  assert.match(attendance,/Select semester/);
+  assert.match(attendance,/X-Attendly-CSRF/);
 });
-test('attendance cache never contains credentials and logout clears it',()=>{
-  assert.match(step,/writeERP\(\{ studentId, academicYear: year, semester, courses, savedAt \}\)/);
-  assert.doesNotMatch(step,/writeERP\([^)]*password|writeERP\([^)]*captcha/i);
-  assert.match(page,/await clearERP\(\)/);
+test('weighted LTPS calculation and planner operate on real parsed records', () => {
+  assert.match(attendance,/totals\(course\)/);
+  assert.match(attendance,/projection\(summary\.attended,summary\.conducted,target,futurePart\)/);
+  assert.match(attendance,/WEIGHTS\[part\]/);
+});
+test('cache stores attendance only and clears on logout', () => {
+  assert.match(attendance,/writeERP\(\{studentId,academicYear:year,semester,courses,savedAt\}\)/);
+  assert.match(home,/await clearERP\(\)/);
+  assert.doesNotMatch(attendance,/writeERP\([^)]*password|writeERP\([^)]*captcha/i);
+});
+test('legacy private-test bookmarks redirect to the home app', () => {
+  assert.match(oldRoute,/redirect\('\/'\)/);
+});
+test('demo API routes and helpers are removed from the deployed frontend', () => {
+  for (const p of [
+    '../app/api/demo/session/route.ts',
+    '../app/api/demo/session/attendance/route.ts',
+    '../app/api/demo/logout/route.ts',
+    '../lib/demo_session.ts',
+  ]) {
+    assert.equal(existsSync(new URL(p,import.meta.url)),false,p+' must be absent');
+  }
 });
