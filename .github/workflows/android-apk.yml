@@ -9,7 +9,7 @@ on:
       - '.github/workflows/android-apk.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-debug-apk:
@@ -52,3 +52,18 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish public debug APK (prerelease)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="attendly-debug-${GITHUB_RUN_NUMBER}"
+          gh release create "${TAG}" \
+            "android/app/build/outputs/apk/debug/app-debug.apk#Attendly-debug.apk" \
+            --title "Attendly Android debug build ${GITHUB_RUN_NUMBER}" \
+            --notes "Unofficial Android debug build for testing. The app opens a Cloudflare Access-protected private ERP staging environment. Public student ERP login is not enabled. Not a Google Play release." \
+            --prerelease \
+            --target "${GITHUB_SHA}"
