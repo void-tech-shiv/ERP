@@ -58,6 +58,6 @@ test('local API maps timetable errors to fixed safe structural diagnostics',()=>
   const api=readFileSync(new URL('../app/api/erp/timetable/route.ts',import.meta.url),'utf8');
   assert.match(api,/process\.env\.NODE_ENV!=='production'/);
   assert.match(api,/TT_SHAPE_T\\d/);
-  assert.match(api,/TT_TIMETABLE_HEADER_CHANGED\]' \+shape/);
+  assert.match(api,/TT_TIMETABLE_HEADER_CHANGED\]'\s*\+\s*shape/);
   assert.doesNotMatch(api,/return fail\(reason/);
 });
