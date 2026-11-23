@@ -2,13 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { CalendarDays, Clock3, MapPin, RefreshCw, ShieldCheck } from 'lucide-react';
+import {
+  DAY_NAMES, groupTimetableSessions, LTPS_LABELS, REFERENCE_SLOT_TIMES,
+  sessionReferenceTime, sessionSlotLabel,
+  type TimetableSlot,
+} from '../lib/timetable_display';
 
 type Option={value:string;label:string};
 type Terms={years:Option[];semesters:Option[]};
-type ClassSlot={
-  day:string;period:number;raw:string;courseCode:string|null;
-  component:'L'|'T'|'P'|'S'|null;section:string|null;room:string|null;
-};
+type ClassSlot=TimetableSlot;
 type Timetable={
   source:'erp';academicYear:string;semester:string;
   days:string[];periods:number[];classes:ClassSlot[];periodsInferred:boolean;
@@ -53,6 +55,7 @@ export default function TimetableStep(){
   const [timetable,setTimetable]=useState<Timetable|null>(null);
   const [loading,setLoading]=useState<'terms'|'timetable'|'idle'>('terms');
   const [error,setError]=useState('');
+  const [activeDay,setActiveDay]=useState('all');
 
   const loadTerms=useCallback(async(signal?:AbortSignal)=>{
     setLoading('terms');setError('');
@@ -67,6 +70,7 @@ export default function TimetableStep(){
       if(!signal?.aborted)setError(e instanceof Error?e.message:'Failed to load academic sessions.');
     }finally{if(!signal?.aborted)setLoading('idle');}
   },[]);
+
   useEffect(()=>{
     const controller=new AbortController();
     void loadTerms(controller.signal);
@@ -75,7 +79,7 @@ export default function TimetableStep(){
 
   async function sync(){
     if(!year||!semester||loading!=='idle')return;
-    setLoading('timetable');setError('');setTimetable(null);
+    setLoading('timetable');setError('');setTimetable(null);setActiveDay('all');
     try{
       const params=new URLSearchParams({year,semester});
       const data=await get<unknown>('/api/erp/timetable?'+params.toString());
@@ -88,32 +92,44 @@ export default function TimetableStep(){
       setError(e instanceof Error?e.message:'Unable to fetch timetable.');
     }finally{setLoading('idle');}
   }
-  const classMap=useMemo(()=>{
-    const map=new Map<string,ClassSlot>();
-    for(const item of timetable?.classes||[])map.set(item.day+'|'+item.period,item);
+
+  const sessionsByDay=useMemo(()=>{
+    const map=new Map<string,ReturnType<typeof groupTimetableSessions>>();
+    for(const day of timetable?.days||[]){
+      map.set(day,groupTimetableSessions(timetable?.classes||[],day));
+    }
     return map;
   },[timetable]);
+  const daysToShow=useMemo(()=>timetable?.days.filter(day=>
+    activeDay==='all'||activeDay===day
+  )||[],[timetable,activeDay]);
+
   const busy=loading!=='idle';
-  return <div className="at-timetable">
+
+  return <div className="at-timetable at-time-redesign">
     <div className="at-time-heading">
-      <div><div className="at-section-label">MY WEEKLY SCHEDULE</div>
-        <h1>Class timetable</h1><p>Courses, LTPS components, sections and rooms from your ERP.</p>
+      <div>
+        <div className="at-section-label">MY WEEKLY SCHEDULE</div>
+        <h1>Class timetable</h1>
+        <p>Your registered courses, LTPS components, sections and rooms from ERP.</p>
       </div>
       <span className="at-session-badge"><ShieldCheck size={16}/> Authenticated ERP</span>
     </div>
 
     <section className="at-term-card at-time-session">
-      <div className="at-term-card-heading"><div className="at-term-icon"><CalendarDays size={19}/></div>
-        <div><strong>Academic session</strong><p>Select an academic year and semester to view classes.</p></div></div>
+      <div className="at-term-card-heading">
+        <div className="at-term-icon"><CalendarDays size={19}/></div>
+        <div><strong>Academic session</strong><p>Select the year and semester to view your classes.</p></div>
+      </div>
       <div className="at-term-controls">
         <label>Academic year
-          <select value={year} onChange={event=>{setYear(event.target.value);setTimetable(null)}} disabled={busy||!terms}>
+          <select value={year} onChange={event=>{setYear(event.target.value);setTimetable(null);setActiveDay('all')}} disabled={busy||!terms}>
             <option value="">{loading==='terms'?'Loading years…':'Select year'}</option>
             {terms?.years.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </label>
         <label>Semester
-          <select value={semester} onChange={event=>{setSemester(event.target.value);setTimetable(null)}} disabled={busy||!terms}>
+          <select value={semester} onChange={event=>{setSemester(event.target.value);setTimetable(null);setActiveDay('all')}} disabled={busy||!terms}>
             <option value="">{loading==='terms'?'Loading semesters…':'Select semester'}</option>
             {terms?.semesters.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
@@ -132,38 +148,97 @@ export default function TimetableStep(){
       <span className="at-spinner"/> Reading your university timetable…
     </div>}
     {timetable&&<>
-      <div className="at-time-grid-heading">
+      <section className="at-time-meta-panel" aria-label="Class legend and reference timings">
+        <div className="at-time-meta-top">
+          <div className="at-time-weights">
+            <span className="at-time-meta-caption">LTPS weights</span>
+            {(['L','T','P','S'] as const).map(part=><span key={part}
+              className={'at-time-weight at-time-weight--'+part}>
+              <strong>{part}</strong> {LTPS_LABELS[part].name}
+              <small>{LTPS_LABELS[part].weight}%</small>
+            </span>)}
+          </div>
+          <span className="at-time-reference-note"><Clock3 size={15}/> Reference slot times · not verified by ERP</span>
+        </div>
+        <div className="at-time-slots-scroll">
+          <div className="at-time-slots-legend">
+            {REFERENCE_SLOT_TIMES.map(slot=><div className="at-time-slot-marker" key={slot.slot}>
+              <strong>S{slot.slot}</strong><span>{slot.start} – {slot.end}</span>
+            </div>)}
+          </div>
+        </div>
+        {timetable.periodsInferred&&<p className="at-time-position-warning">
+          ERP response had no readable period headers. Class slot numbers below are positions
+          inferred from its columns; reference times above may not match those positions.
+        </p>}
+      </section>
+
+      <div className="at-time-schedule-top">
         <div><h2>Weekly timetable</h2>
           <p>{timetable.academicYear} · {timetable.semester} · {timetable.days.length} teaching days</p></div>
-        <span><Clock3 size={15}/> {timetable.periodsInferred?'Period positions from ERP grid':'Period numbers from ERP'}</span>
+        <span className="at-time-summary-count">
+          {timetable.days.reduce((total,day)=>total+(sessionsByDay.get(day)?.length||0),0)} class sessions
+        </span>
       </div>
-      <section className="at-panel at-time-grid-panel">
-        <div className="at-time-grid-scroll">
-          <table className="at-time-grid">
-            <thead><tr><th scope="col" className="at-time-sticky">Day</th>
-              {timetable.periods.map(period=><th scope="col" key={period}>S{period}</th>)}</tr></thead>
-            <tbody>{timetable.days.map(day=><tr key={day}>
-              <th scope="row" className="at-time-sticky">{day}</th>
-              {timetable.periods.map(period=>{
-                const current=classMap.get(day+'|'+period);
-                return <td key={period}>
-                  {current&&<div className="at-time-class" title={current.raw}>
-                    <strong>{current.courseCode||current.raw}</strong>
-                    {current.component&&<span className="at-time-component">{current.component}</span>}
-                    {current.section&&<small>{current.section}</small>}
-                    {current.room&&<span className="at-time-room"><MapPin size={12}/>{current.room}</span>}
-                    {!current.courseCode&&<small>ERP timetable entry</small>}
-                  </div>}
-                </td>;
+
+      <nav className="at-time-day-tabs" aria-label="Timetable day filter">
+        <button type="button" className={activeDay==='all'?'active':''}
+          aria-pressed={activeDay==='all'} onClick={()=>setActiveDay('all')}>
+          Full week
+        </button>
+        {timetable.days.map(day=><button type="button" key={day}
+          className={activeDay===day?'active':''} aria-pressed={activeDay===day}
+          onClick={()=>setActiveDay(day)}>{DAY_NAMES[day]||day}</button>)}
+      </nav>
+
+      <div className={'at-time-day-grid '+(activeDay!=='all'?'at-time-day-grid--single':'')}>
+        {daysToShow.map((day)=>{
+          const sessions=sessionsByDay.get(day)||[];
+          const number=timetable.days.indexOf(day)+1;
+          return <section className="at-time-day-card" key={day}
+            aria-label={(DAY_NAMES[day]||day)+' classes'}>
+            <header className="at-time-day-head">
+              <span className="at-time-day-number">{String(number).padStart(2,'0')}</span>
+              <div><h3>{DAY_NAMES[day]||day}</h3>
+                <p>{sessions.length?'Scheduled classes':'No classes listed'}</p></div>
+              <span className="at-time-day-count">
+                {sessions.length} {sessions.length===1?'class':'classes'}
+              </span>
+            </header>
+            <div className="at-time-day-lessons">
+              {sessions.map((session)=>{
+                const kind=session.component||'unknown';
+                const referenceTime=sessionReferenceTime(session,timetable.periodsInferred);
+                return <article className={'at-time-lesson at-time-lesson--'+kind}
+                  key={day+'-'+session.startPeriod+'-'+session.endPeriod+'-'+(session.courseCode||session.raw)}>
+                  <div className="at-time-lesson-left">
+                    {referenceTime&&<span className="at-time-lesson-time">{referenceTime}</span>}
+                    <span className="at-time-lesson-slots">{sessionSlotLabel(session)}</span>
+                    {!referenceTime&&<small>{timetable.periodsInferred?'Period position':'Time not available'}</small>}
+                  </div>
+                  <div className="at-time-lesson-right">
+                    <div className="at-time-lesson-title">
+                      <strong>{session.courseCode||session.raw}</strong>
+                      {session.component&&<span className={'at-time-type at-time-type--'+session.component}
+                        title={LTPS_LABELS[session.component].name}>{session.component}</span>}
+                      {session.section&&<span className="at-time-lesson-section">{session.section}</span>}
+                    </div>
+                    <div className="at-time-lesson-room">
+                      <MapPin size={13}/>{session.room||'Room not listed'}
+                    </div>
+                  </div>
+                </article>;
               })}
-            </tr>)}</tbody>
-          </table>
-        </div>
-      </section>
+              {!sessions.length&&<div className="at-time-no-lessons">No classes scheduled for this day.</div>}
+            </div>
+          </section>;
+        })}
+      </div>
       <p className="at-time-note"><ShieldCheck size={16}/>
-        Periods are aligned to the timetable columns received from ERP. When a header is
-        absent, positions are inferred from column order, not verified period labels.
-        Start and end times are not supplied; confirm timings with the university.</p>
+        Only class details returned by your authenticated university ERP session are shown.
+        Consecutive identical periods are combined into one card. The S1–S11 times are
+        provided as a reference, not confirmed by ERP; check the university timetable
+        for official start times, especially when period positions are inferred.</p>
     </>}
     {!timetable&&loading==='idle'&&!error&&
       <div className="at-time-empty"><CalendarDays size={30}/>
