@@ -260,3 +260,35 @@ notice, data deletion and consent UX, university authorization, end-to-end
 tests with an approved test account, upstream logout/revocation behavior and
 monitoring. The current private test uses an encrypted cookie (not Redis)
 because serverless instances cannot rely on in-memory state.
+
+## Phase 5: real LTPS attendance after verified login (private preview)
+
+The observed live ERP login was verified by the student in the Vercel preview.
+The login endpoint remains unchanged. Its success is necessary but does **not**
+by itself trigger term or attendance fetching.
+
+After authentication the private page now shows an independent Step 2:
+
+1. Click **Load academic years & semesters**. This invokes
+   `GET /api/erp/terms` using the authenticated ERP session.
+2. Select academic year and semester explicitly. The numeric ERP option IDs are
+   looked up from the *current* attendance form; no term IDs are hardcoded.
+3. Click **Fetch attendance**. The server invokes
+   `POST /api/erp/attendance` with the session CSRF, chosen term IDs and the
+   authenticated cookie jar, then parses the HTML register into LTPS counts.
+4. Review subject percentages and the overall weighted total:
+   L × 1.0, T × 0.5, P × 0.5, S × 0.25.
+   Overall is sum(weighted attended) / sum(weighted conducted), **not** the
+   simple average of individual course percentages.
+
+Data returned to the browser includes only course names/codes and attended /
+conducted LTPS counts, not university cookies, CAPTCHA, passwords, CSRF,
+or per-student Register links. Attendance is cached in this browser's
+IndexedDB (plain academic data, so avoid shared devices) for offline display
+and cleared after successful logout. CSRF remains in component memory.
+
+**Verification:** The live *login* was confirmed by the student. The real
+attendance term-list and attendance response flows still require the student
+to test on the protected preview. No production ERP credential endpoints
+are enabled. Public rollout requires the university's permission and a
+security/privacy review.
