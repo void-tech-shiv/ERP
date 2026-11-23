@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight, BookOpen, CalendarDays, Clock3, Eye, EyeOff,
-  GraduationCap, MapPin, Pencil, RefreshCw, ShieldCheck, Sparkles,
+  GraduationCap, MapPin, RefreshCw, ShieldCheck, Sparkles,
 } from 'lucide-react';
 import { fmt, totals, type Course } from '../lib/calculator';
 import {
@@ -26,14 +26,11 @@ type View='attendance'|'cgpa'|'seating'|'timetable'|'settings';
 type Props={
   studentId:string;
   nickname:string;
-  onNicknameChange:(name:string)=>void;
   showCgpa:boolean;
   onCgpaVisibilityChange:(value:boolean)=>void;
   terms:Terms|null;
   year:string;
   semester:string;
-  onYearChange:(value:string)=>void;
-  onSemesterChange:(value:string)=>void;
   autoLoadCurrentSession:boolean;
   cachedTimetable:OverviewTimetableCache|null;
   onTimetableLoaded:(next:OverviewTimetableCache)=>void;
@@ -81,14 +78,12 @@ function greeting(hour:number):string{
 const todayKey=(value:Date)=>['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][value.getDay()];
 
 export default function OverviewStep({
-  studentId,terms,year,semester,onYearChange,onSemesterChange,
-  nickname,onNicknameChange,showCgpa,onCgpaVisibilityChange,
+  studentId,terms,year,semester,
+  nickname,showCgpa,onCgpaVisibilityChange,
   autoLoadCurrentSession,cachedTimetable,onTimetableLoaded,
   attendance,attendanceBusy,attendanceError,onRefreshAttendance,onNavigate,
 }:Props){
   const [now,setNow]=useState<Date|null>(null);
-  const [draftNickname,setDraftNickname]=useState('');
-  const [editingNickname,setEditingNickname]=useState(false);
   const [timetable,setTimetable]=useState<{key:string;value:TimetablePayload}|null>(null);
   const [loadingTimetable,setLoadingTimetable]=useState(false);
   const [timetableError,setTimetableError]=useState('');
@@ -106,15 +101,6 @@ export default function OverviewStep({
     const clock=window.setInterval(()=>setNow(new Date()),60_000);
     return ()=>window.clearInterval(clock);
   },[studentId]);
-  useEffect(()=>setDraftNickname(nickname),[nickname]);
-
-  function saveNickname(){
-    const safe=draftNickname.trim().replace(/\s+/g,' ').slice(0,32);
-    onNicknameChange(safe);
-    setDraftNickname(safe);
-    setEditingNickname(false);
-  }
-
   const currentKey=year+'|'+semester;
   const shownAttendance=attendance&&attendance.academicYear===year&&
     attendance.semester===semester?attendance:null;
@@ -233,52 +219,33 @@ export default function OverviewStep({
         <span><CalendarDays size={15}/>
           {now?new Intl.DateTimeFormat('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(now):'Today'}
         </span>
-        {editingNickname?
-          <form className="at-home-nickname-form" onSubmit={event=>{event.preventDefault();saveNickname();}}>
-            <label className="at-home-sr-only" htmlFor="at-home-nickname">Student nickname</label>
-            <input id="at-home-nickname" maxLength={32} autoFocus value={draftNickname}
-              placeholder="Your nickname" onChange={event=>setDraftNickname(event.target.value)}/>
-            <button type="submit">Save</button>
-            <button type="button" onClick={()=>{setDraftNickname(nickname);setEditingNickname(false);}}>Cancel</button>
-          </form>:
-          <button type="button" className="at-home-edit-nickname"
-            onClick={()=>{setDraftNickname(nickname);setEditingNickname(true);}}>
-            <Pencil size={14}/>{nickname?'Edit nickname':'Set a nickname'}
-          </button>}
       </div>
-      <small className="at-home-nickname-note">Nickname is optional and saved only on this browser.</small>
     </section>
 
-    <section className="at-home-session at-panel" aria-label="Current semester selection">
+    <section className="at-home-session at-panel" aria-label="Current academic session">
       <div className="at-home-session-heading"><div>
         <div className="at-section-label">CURRENT SEMESTER</div>
         <h2>Your current academic session</h2>
-        <p>Saved settings are preselected and attendance + today's timetable load automatically.</p>
+        <p>Your saved semester from Settings. Attendance and today's timetable load automatically.</p>
       </div><div className="at-home-session-actions">
         <span className="at-home-authenticated"><ShieldCheck size={15}/> Secure ERP session</span>
         <button type="button" className="at-home-edit-settings"
           onClick={()=>onNavigate('settings')}>Edit Settings <ArrowRight size={14}/></button>
       </div></div>
-      <div className="at-home-session-fields">
-        <label>Academic year
-          <select value={year} onChange={event=>onYearChange(event.target.value)}
-            disabled={!terms||overviewBusy}>
-            <option value="">Select year</option>
-            {terms?.years.map(y=><option key={y} value={y}>{y}</option>)}
-          </select>
-        </label>
-        <label>Semester
-          <select value={semester} onChange={event=>onSemesterChange(event.target.value)}
-            disabled={!terms||overviewBusy}>
-            <option value="">Select semester</option>
-            {terms?.semesters.map(s=><option key={s} value={s}>{s}</option>)}
-          </select>
-        </label>
+      <div className="at-home-session-fields at-home-session-readonly">
+        <div className="at-home-session-value">
+          <span>Academic year</span>
+          <strong>{year||'Not configured'}</strong>
+        </div>
+        <div className="at-home-session-value">
+          <span>Current semester</span>
+          <strong>{semester||'Not configured'}</strong>
+        </div>
         <button type="button" className="at-btn at-btn-primary" disabled={!canSync||overviewBusy}
           onClick={()=>void refreshOverview()}><RefreshCw size={17}/>
           {overviewBusy?'Loading…':'Refresh overview'}</button>
       </div>
-      {!canSync&&<p className="at-home-help">Select a year and semester, or save your current session in Settings.</p>}
+      {!canSync&&<p className="at-home-help">Choose your current year and semester in Settings to load your academic data.</p>
       {autoLoadCurrentSession&&loadingTimetable&&
         <p className="at-home-help" role="status">Loading your current-semester data from ERP automatically…</p>}
     </section>
@@ -367,7 +334,7 @@ export default function OverviewStep({
           <Clock3 size={27}/> {canSync?
             (timetableError?'Could not load today’s classes. Use Refresh overview to retry.':
               'Your current-semester timetable will load automatically.'):
-            'Select your current semester to see today’s classes.'}
+            'Set your current semester in Settings to see today’s classes.'}
         </div>}
       {liveTimetable?.periodsInferred&&<p className="at-home-timing-note">
         ERP did not provide readable period headers. Slot positions are inferred and time ranges are not verified.
