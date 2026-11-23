@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ArrowRight, BookOpen, CalendarDays, ChartNoAxesCombined, ChevronRight,
+  BookOpen, CalendarDays, ChartNoAxesCombined, ChevronRight,
   CircleHelp, Clock3, GraduationCap, LogOut, RefreshCw, ShieldCheck,
   Target,
 } from 'lucide-react';
@@ -97,7 +97,7 @@ export default function AttendanceStep({
   const [terms,setTerms]=useState<Terms|null>(null);
   const [year,setYear]=useState('');
   const [semester,setSemester]=useState('');
-  const [loading,setLoading]=useState<Loading>('idle');
+  const [loading,setLoading]=useState<Loading>('terms');
   const [error,setError]=useState('');
   const [display,setDisplay]=useState<DisplayData|null>(null);
   const [target,setTarget]=useState(75);
@@ -120,22 +120,34 @@ export default function AttendanceStep({
     return {percent:conducted?100*attended/conducted:null};
   },[display]);
 
-  async function loadTerms(){
+  // Automatically load available terms once login is verified. The user's
+  // selection and the actual attendance sync remain explicit actions.
+  const loadTerms=useCallback(async(signal?:AbortSignal)=>{
+    if(signal?.aborted)return;
     setLoading('terms');setError('');
     try {
-      const result=await api<Terms>('/api/erp/terms');
+      const result=await api<Terms>('/api/erp/terms',{signal});
+      if(signal?.aborted)return;
       const years=Array.isArray(result.years)?result.years.filter(v=>typeof v==='string'&&v.length<=40):[];
       const semesters=Array.isArray(result.semesters)?result.semesters.filter(v=>typeof v==='string'&&v.length<=40):[];
       if(!years.length||!semesters.length)
         throw new Error('No academic sessions were returned. Please try again.');
       setTerms({years,semesters});
-      // A saved choice is a convenience only; the user still starts each sync.
-      setYear(years.includes(display?.academicYear||'')?display!.academicYear:'');
-      setSemester(semesters.includes(display?.semester||'')?display!.semester:'');
+      // Keep an existing choice only when it remains valid after a reload.
+      setYear(previous=>years.includes(previous)?previous:'');
+      setSemester(previous=>semesters.includes(previous)?previous:'');
     } catch(e){
-      setError(e instanceof Error?e.message:'Could not load academic sessions.');
-    } finally{setLoading('idle');}
-  }
+      if(!signal?.aborted)setError(e instanceof Error?e.message:'Could not load academic sessions.');
+    } finally{
+      if(!signal?.aborted)setLoading('idle');
+    }
+  },[]);
+
+  useEffect(()=>{
+    const controller=new AbortController();
+    void loadTerms(controller.signal);
+    return ()=>controller.abort();
+  },[studentId,loadTerms]);
 
   async function syncAttendance(){
     if(!terms||!terms.years.includes(year)||!terms.semesters.includes(semester)){
@@ -222,33 +234,29 @@ export default function AttendanceStep({
         <section className="at-term-card">
           <div className="at-term-card-heading"><div className="at-term-icon"><CalendarDays size={20}/></div>
             <div><strong>Academic session</strong><p>Choose the year and semester to view attendance</p></div></div>
-          {!terms ? <div className="at-term-first">
-            <span><Clock3 size={15}/> {display?'Last synced: '+dateLabel:'Ready to load your academic terms'}</span>
-            <button className="at-btn at-btn-primary" type="button" disabled={busy}
-              onClick={()=>void loadTerms()}>
-              {loading==='terms'?<><span className="at-spinner at-spinner-white"/> Loading…</>:<>Select academic session <ArrowRight size={17}/></>}
-            </button>
-          </div> : <div className="at-term-controls">
+          <div className="at-term-controls">
             <label>Academic year
-              <select value={year} onChange={e=>setYear(e.target.value)} disabled={busy}>
-                <option value="">Select year</option>
-                {terms.years.map(v=><option key={v} value={v}>{v}</option>)}
+              <select value={year} onChange={e=>setYear(e.target.value)} disabled={busy||!terms}
+                aria-label="Academic year">
+                <option value="">{loading==='terms'?'Loading years…':'Select year'}</option>
+                {terms?.years.map(v=><option key={v} value={v}>{v}</option>)}
               </select>
             </label>
             <label>Semester
-              <select value={semester} onChange={e=>setSemester(e.target.value)} disabled={busy}>
-                <option value="">Select semester</option>
-                {terms.semesters.map(v=><option key={v} value={v}>{v}</option>)}
+              <select value={semester} onChange={e=>setSemester(e.target.value)} disabled={busy||!terms}
+                aria-label="Semester">
+                <option value="">{loading==='terms'?'Loading semesters…':'Select semester'}</option>
+                {terms?.semesters.map(v=><option key={v} value={v}>{v}</option>)}
               </select>
             </label>
             <button className="at-btn at-btn-primary" type="button" onClick={()=>void syncAttendance()}
-              disabled={busy||!year||!semester}>
+              disabled={busy||!terms||!year||!semester}>
               {loading==='attendance'?<><span className="at-spinner at-spinner-white"/> Syncing…</>:<><RefreshCw size={17}/> Sync attendance</>}
             </button>
             <button className="at-icon-button at-terms-reload" type="button"
               disabled={busy} onClick={()=>void loadTerms()} title="Reload academic terms"
               aria-label="Reload academic terms"><RefreshCw size={18}/></button>
-          </div>}
+          </div>
           {error&&<div className="at-message at-message-error" role="alert">{error}</div>}
         </section>
 
@@ -259,8 +267,7 @@ export default function AttendanceStep({
           <span className="at-empty-tag">YOUR DATA, YOUR DASHBOARD</span>
           <h2>See your progress come to life.</h2>
           <p>Select your academic year and semester, then sync attendance to unlock your personalized overview.</p>
-          {!terms&&<button className="at-btn at-btn-outline" onClick={()=>void loadTerms()} disabled={busy}>
-            Load academic sessions <ArrowRight size={16}/></button>}
+
         </div>}
 
         {display&&<>
