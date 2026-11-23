@@ -30,15 +30,28 @@ export async function GET(request:NextRequest){
       'UniversityMasterAcademicTimetableView[semesterid]':semester,
     });
     const response=await upstream('/index.php?'+params.toString(),state);
-    if(response.status===403)return fail('ERP denied this timetable request',502);
-    if(response.status!==200)return fail('ERP timetable is temporarily unavailable',502);
+    if(response.status===403)return fail('ERP returned HTTP 403 for the timetable request [TT_HTTP_403]',502);
+    if(response.status>=300&&response.status<400)
+      return fail('ERP redirected the timetable request [TT_REDIRECT]',502);
+    if(response.status!==200)
+      return fail('ERP timetable returned an unexpected status [TT_HTTP_OTHER]',502);
     const timetable=parseTimetable(await response.text());
     await setERPState(state);
     return NextResponse.json({
       source:'erp',academicYear:terms.years.find(x=>x.value===year)!.label,
       semester:terms.semesters.find(x=>x.value===semester)!.label,...timetable,
     },{headers:{'Cache-Control':'private, no-store',Vary:'Cookie'}});
-  }catch{
-    return fail('ERP timetable could not be loaded. The university may be denying this request.',502);
+  }catch(error){
+    // Fixed diagnostic labels only. Never return HTML, student IDs, cookies,
+    // CSRF values, redirect URLs or upstream exception details to the client.
+    const reason=error instanceof Error?error.message:'';
+    if(reason==='ERP denied timetable access')
+      return fail('Official ERP showed a Forbidden page [TT_FORBIDDEN_HTML]',502);
+    if(reason.startsWith('ERP timetable grid not found'))
+      return fail('ERP responded without the timetable grid [TT_GRID_MISSING]',502);
+    if(reason.startsWith('ERP timetable day row changed')||
+       reason.startsWith('Unexpected ERP timetable cell size'))
+      return fail('ERP timetable layout changed [TT_LAYOUT_CHANGED]',502);
+    return fail('Could not retrieve timetable from the authenticated ERP session [TT_FETCH_ERROR]',502);
   }
 }
