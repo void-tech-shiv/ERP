@@ -3,6 +3,7 @@ import { load } from 'cheerio';
 import { resolveERPRedirect, type RedirectError } from '../../../../lib/server/erp_redirect';
 import { inspectERPPage } from '../../../../lib/server/erp_auth_verify';
 import { cookieTransition } from '../../../../lib/server/erp_diagnostics';
+import { buildERPLoginForm } from '../../../../lib/server/erp_login_form';
 import {
   clearERPState, fail, getERPState, setERPState, testingEnabled,
   upstream, validOrigin, validateCSRF
@@ -26,6 +27,7 @@ type SafeDiagnostic = {
   stage: 'login-post' | 'redirect' | 'dashboard' | 'session-write';
   redirectReason?: RedirectError | 'too_many_redirects';
   redirectKind?: 'index' | 'root';
+  redirectSource?: 'location' | 'pjax-url' | 'fixed-fallback';
   redirectsFollowed?: number;
   upgradedHttps?: boolean;
   fallback?: 'index-probe' | 'dashboard-probe';
@@ -115,14 +117,9 @@ export async function POST(request:Request) {
     if(fields?.consent!==true) return fail('Confirm personal-account testing consent',403);
     if(!state.formToken || !state.loginAction || !Object.keys(state.upstream).length)
       return failure('CSRF_OR_SESSION_REJECTED');
-    const form=new URLSearchParams({
-      '_csrf':state.formToken,
-      'LoginForm[username]':username,
-      'LoginForm[password]':password,
-      'LoginForm[captcha]':captcha,
-      'LoginForm[qr_code]':'',
-      'login-button':'',
-    });
+    // Chrome's official NewERP login uses multipart/form-data. fetch
+    // generates the multipart boundary; no manual Content-Type header.
+    const form=buildERPLoginForm(state.formToken,username,password,captcha);
     const cookiesBeforeLogin={...state.upstream};
     const result=await upstream(state.loginAction,state,'POST',form);
     const cookieSignal=cookieTransition(cookiesBeforeLogin,state.upstream);
@@ -136,12 +133,18 @@ export async function POST(request:Request) {
     if([301,302,303].includes(result.status)) {
       diagnostic.loginResponseType='redirect';
       diagnostic.stage='redirect';
-      const target=resolveERPRedirect(result.headers.get('location'),state.loginAction);
+      // The real ERP sends X-Pjax-Url rather than Location on its 302.
+      // Treat it as navigation metadata, never as proof of login.
+      const location=result.headers.get('location');
+      const pjaxUrl=result.headers.get('x-pjax-url');
+      const target=resolveERPRedirect(location || pjaxUrl,state.loginAction);
       if(target.ok) {
         dashboardUrl=target.url;
         diagnostic.redirectKind=target.kind;
+        diagnostic.redirectSource=location?'location':'pjax-url';
         if(target.upgradedHttps) diagnostic.upgradedHttps=true;
       } else if(target.reason==='missing_location') {
+        diagnostic.redirectSource='fixed-fallback';
         // Some 302 responses omit Location. Only probe the fixed known
         // dashboard; never infer authentication from the 302 itself.
         diagnostic.redirectReason='missing_location';
