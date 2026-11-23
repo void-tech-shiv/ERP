@@ -28,7 +28,7 @@ test('nickname greeting is editable and only explicitly saved on this browser',(
 });
 test('CGPA is hidden by default, fetched only when Show is pressed, cleared on Hide',()=>{
   assert.match(overview,/const cgpaVisible=showCgpa/);
-  assert.match(overview,/if\(!cgpaVisible\)return;/);
+  assert.match(overview,/if\(!cgpaVisible\|\|!readyForCGPA\)return;/);
   assert.match(overview,/getJson\('\/api\/erp\/cgpa',controller\.signal\)/);
   assert.match(overview,/onCgpaVisibilityChange\(!cgpaVisible\)/);
   assert.match(overview,/aria-label=\{cgpaVisible\?'Hide CGPA':'Show CGPA'\}/);
