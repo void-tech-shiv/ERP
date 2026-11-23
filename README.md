@@ -3,7 +3,17 @@
 Independent, student-focused attendance dashboard (prototype).
 
 ## Current status
-Phase 1: weighted attendance dashboard. Phase 2: HTML response parsing. Phase 3: isolated session/CAPTCHA/login/attendance engine validated against synthetic ERP responses. Phase 4: secure, demo-only browser sessions integrated into the dashboard. **The real ERP public login API is still disabled and this repository has not been validated against the real KL NewERP login.** Never enter real ERP credentials into an unverified demo.
+**Real ERP login and attendance retrieval have been verified in a protected Vercel preview.**
+The Next.js homepage is now the Attendly student workspace: sign in to KL NewERP with
+a student-solved CAPTCHA, select academic year and semester, sync real LTPS attendance,
+and view a subject breakdown and weighted attendance planner. Old `/private-test`
+bookmarks redirect to `/`. All frontend sample-data screens and demo API routes
+were removed during the UI redesign.
+
+**Access remains restricted.** Live university integration is enabled only on
+protected private preview deployments, not in public production. Public student
+launch still requires university authorization, privacy/security review, rate
+limiting and operational monitoring.
 
 ## Calculation
 - Lecture (L): 100%
@@ -56,7 +66,7 @@ npm run dev
 
 Open http://localhost:3000. Backend API docs: http://localhost:8000/api/docs.
 
-Demo subject records are sample data, not from NewERP. Recovery/bunk estimates assume future classes all belong to one selected LTPS component and do not guarantee university eligibility.
+The interface uses actual attendance returned by the authenticated ERP session; no sample attendance is displayed. Recovery/miss estimates assume future classes all belong to one selected LTPS component and do not guarantee university eligibility.
 
 ## Verified ERP attendance response (November 2026)
 
